@@ -1,0 +1,1024 @@
+import { v } from "convex/values";
+import { mutation, query, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
+
+// Create or get user (for both registered and anonymous)
+export const createOrGetUser = mutation({
+  args: {
+    clerkId: v.optional(v.string()),
+    anonymousUuid: v.optional(v.string()),
+    email: v.optional(v.string()),
+  },
+  handler: async (ctx, { clerkId, anonymousUuid, email }) => {
+    const now = Date.now();
+    
+    // Try to find existing user first (this is idempotent)
+    let existingUser = null;
+    if (clerkId) {
+      existingUser = await ctx.db
+        .query("app_users")
+        .withIndex("by_clerk_id", (q) => q.eq("clerk_id", clerkId))
+        .first();
+    } 
+    
+    // If we don't find a Clerk user but have an anonymousUuid, check for migration scenario
+    if (!existingUser && clerkId && anonymousUuid) {
+      // Check if there's an anonymous user that needs to be linked to this Clerk account
+      const anonymousUser = await ctx.db
+        .query("app_users")
+        .withIndex("by_anonymous_uuid", (q) => q.eq("anonymous_uuid", anonymousUuid))
+        .first();
+        
+      if (anonymousUser && !anonymousUser.clerk_id) {
+        console.log("Migrating anonymous user to Clerk account:", {
+          anonymousUuid,
+          clerkId
+        });
+        
+        // Update the anonymous user record to include Clerk ID
+        // CRITICAL: Remove anonymous_uuid when migrating to registered to prevent contamination
+        await ctx.db.patch(anonymousUser._id, {
+          clerk_id: clerkId,
+          email: email || anonymousUser.email,
+          is_registered: true,
+          last_seen_at: now,
+          updated_at: now,
+          anonymous_uuid: undefined, // REMOVE guest UUID from registered users
+        });
+        
+        return anonymousUser._id;
+      }
+    }
+    
+    // If no Clerk user found, try anonymous lookup
+    if (!existingUser && anonymousUuid) {
+      existingUser = await ctx.db
+        .query("app_users")
+        .withIndex("by_anonymous_uuid", (q) => q.eq("anonymous_uuid", anonymousUuid))
+        .first();
+        
+      // CRITICAL: If this anonymous UUID belongs to a registered user, reject it
+      if (existingUser && existingUser.is_registered && !clerkId) {
+        console.log("❌ Anonymous UUID belongs to registered user - rejecting");
+        throw new Error("This anonymous UUID is associated with a registered account. Please sign in or use a different browser.");
+      }
+    }
+
+    if (existingUser) {
+      // User exists, safely update last seen (this is safe to retry)
+      try {
+        await ctx.db.patch(existingUser._id, {
+          last_seen_at: now,
+          updated_at: now,
+        });
+      } catch (error) {
+        // If patch fails due to concurrent update, that's fine - just return the user ID
+        console.log("Concurrent update on existing user, continuing...");
+      }
+      return existingUser._id;
+    }
+
+    // User doesn't exist, try to create
+    try {
+      const userId = await ctx.db.insert("app_users", {
+        email: email || undefined,
+        last_seen_at: now,
+        total_conversations: 0,
+        total_searches: 0,
+        created_at: now,
+        updated_at: now,
+        message_count: 0,
+        clerk_id: clerkId || undefined,
+        total_tokens: 500,
+        used_tokens: 0,
+        last_token_refresh: now,
+        is_registered: !!clerkId,
+        role: "user",
+        // CRITICAL: Only assign anonymous_uuid to guest users, never to registered users
+        anonymous_uuid: clerkId ? undefined : (anonymousUuid || undefined),
+      });
+      return userId;
+    } catch (error) {
+      // If insert fails due to concurrent creation, try to find the user again
+      console.log("Concurrent user creation detected, searching for existing user...");
+      
+      if (clerkId) {
+        existingUser = await ctx.db
+          .query("app_users")
+          .withIndex("by_clerk_id", (q) => q.eq("clerk_id", clerkId))
+          .first();
+      } else if (anonymousUuid) {
+        existingUser = await ctx.db
+          .query("app_users")
+          .withIndex("by_anonymous_uuid", (q) => q.eq("anonymous_uuid", anonymousUuid))
+          .first();
+      }
+      
+      if (existingUser) {
+        return existingUser._id;
+      }
+      
+      // If we still can't find the user, re-throw the error
+      throw error;
+    }
+  },
+});
+
+// Create or get a session
+export const createOrGetSession = mutation({
+  args: {
+    sessionId: v.string(),
+    userId: v.optional(v.id("app_users")),
+    anonymousUuid: v.optional(v.string()),
+  },
+  handler: async (ctx, { sessionId, userId, anonymousUuid }) => {
+    console.log("🏗️ createOrGetSession called:", { sessionId, userId, anonymousUuid });
+    
+    // Try to find existing session
+    const existingSession = await ctx.db
+      .query("chat_sessions")
+      .withIndex("by_session_id", (q) => q.eq("session_id", sessionId))
+      .first();
+
+    if (existingSession) {
+      console.log("📋 Found existing session:", {
+        sessionId,
+        existingUserId: existingSession.user_id,
+        existingAnonymousUuid: existingSession.anonymous_uuid,
+        currentUserId: userId,
+        currentAnonymousUuid: anonymousUuid
+      });
+      
+      // Check if ownership needs to be transferred
+      const needsOwnershipTransfer = userId && 
+        existingSession.user_id !== userId && 
+        !existingSession.user_id; // Only transfer if session has no permanent user
+        
+      const needsUserUpdate = userId && 
+        existingSession.user_id !== userId;
+      
+      if (needsOwnershipTransfer || needsUserUpdate) {
+        console.log("🔄 Transferring session ownership:", {
+          from: { userId: existingSession.user_id, anonymousUuid: existingSession.anonymous_uuid },
+          to: { userId, anonymousUuid }
+        });
+        
+        await ctx.db.patch(existingSession._id, { 
+          user_id: userId,
+          anonymous_uuid: anonymousUuid
+        });
+        
+        console.log("✅ Session ownership transferred successfully");
+      }
+      
+      console.log("✅ Found existing session:", existingSession._id);
+      return existingSession._id;
+    }
+
+    // Create new session
+    console.log("🆕 Creating new session:", { 
+      sessionId, 
+      userId, 
+      anonymousUuid,
+      sessionType: userId ? 'authenticated' : 'guest',
+      userIdIsUndefined: userId === undefined,
+      anonymousUuidValue: anonymousUuid
+    });
+    
+    const sessionId_db = await ctx.db.insert("chat_sessions", {
+      session_id: sessionId,
+      user_id: userId,
+      anonymous_uuid: anonymousUuid,
+      message_count: 0,
+      started_at: Date.now(),
+      is_active: true,
+    });
+
+    console.log("✅ New session created:", sessionId_db);
+
+    // Update user's conversation count if user exists
+    if (userId) {
+      const user = await ctx.db.get(userId);
+      if (user) {
+        await ctx.db.patch(userId, {
+          total_conversations: user.total_conversations + 1,
+          updated_at: Date.now(),
+        });
+        console.log("✅ User conversation count updated");
+      }
+    }
+
+    return sessionId_db;
+  },
+});
+
+// Save message to database
+export const saveMessage = mutation({
+  args: {
+    sessionId: v.string(),
+    userId: v.optional(v.id("app_users")),
+    anonymousUuid: v.optional(v.string()),
+    messageId: v.string(),
+    executionId: v.optional(v.string()),  // Add execution ID for message-source tracking
+    role: v.union(v.literal("user"), v.literal("assistant")),
+    content: v.string(),
+    hasAudio: v.optional(v.boolean()),
+    sources: v.optional(v.array(v.object({
+      id: v.number(),
+      short_id: v.optional(v.string()),  // Original string ID from backend
+      url: v.string(),
+      title: v.string(),
+      domain: v.string(),
+      snippet: v.string(),
+      accessed_date: v.string(),
+      relevance_score: v.number(),
+      claims_count: v.optional(v.number()),  // Number of claims from this source
+      has_claims: v.optional(v.boolean()),  // Whether source has claims
+    }))), // Citation sources for assistant messages
+    timestamp: v.number(),
+  },
+  handler: async (ctx, args) => {
+    console.log("💾 saveMessage called:", {
+      sessionId: args.sessionId,
+      messageId: args.messageId,
+      role: args.role,
+      contentLength: args.content.length,
+      userId: args.userId,
+      anonymousUuid: args.anonymousUuid
+    });
+    
+    const now = Date.now();
+    
+    // Save message
+    await ctx.db.insert("messages", {
+      session_id: args.sessionId,
+      user_id: args.userId,
+      anonymous_uuid: args.anonymousUuid,
+      message_id: args.messageId,
+      execution_id: args.executionId,  // Save execution ID for message-source tracking
+      role: args.role,
+      content: args.content,
+      has_audio: args.hasAudio,
+      sources: args.sources,
+      timestamp: args.timestamp,
+      created_at: now,
+    });
+
+    console.log("✅ Message saved to database");
+
+    // Update session message count
+    const session = await ctx.db
+      .query("chat_sessions")
+      .withIndex("by_session_id", (q) => q.eq("session_id", args.sessionId))
+      .first();
+
+    if (session) {
+      const newMessageCount = session.message_count + 1;
+      await ctx.db.patch(session._id, {
+        message_count: newMessageCount,
+      });
+      console.log("✅ Session message count updated:", {
+        sessionId: args.sessionId,
+        oldCount: session.message_count,
+        newCount: newMessageCount,
+        willShowInHistory: newMessageCount > 0,
+        isFirstMessage: session.message_count === 0,
+        sessionUserId: session.user_id,
+        sessionAnonymousUuid: session.anonymous_uuid
+      });
+      
+      // Log if this is the first message (session should now appear in history)
+      if (session.message_count === 0) {
+        console.log("🎉 First message saved - session should now appear in history!");
+      }
+    } else {
+      console.log("❌ Session not found when updating message count:", args.sessionId);
+    }
+
+    // Update user message count
+    if (args.userId) {
+      const user = await ctx.db.get(args.userId);
+      if (user) {
+        await ctx.db.patch(args.userId, {
+          message_count: user.message_count + 1,
+          updated_at: now,
+        });
+        console.log("✅ User message count updated:", args.userId);
+      }
+    }
+  },
+});
+
+// Get conversation history with privacy checks
+export const getConversationHistory = query({
+  args: {
+    sessionId: v.string(),
+  },
+  handler: async (ctx, { sessionId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    
+    // First, find the session to check ownership
+    const session = await ctx.db
+      .query("chat_sessions")
+      .withIndex("by_session_id", (q) => q.eq("session_id", sessionId))
+      .first();
+    
+    if (!session) {
+      console.log("❌ Session not found:", sessionId);
+      return [];
+    }
+    
+    // Verify user owns this session
+    if (session.user_id) {
+      const user = await ctx.db.get(session.user_id);
+      if (!user) {
+        console.log("❌ User not found for session:", sessionId);
+        return [];
+      }
+      
+      // Privacy check: ensure user can access this session
+      if (user.is_registered) {
+        if (!identity || user.clerk_id !== identity.subject) {
+          console.log("❌ PRIVACY VIOLATION: Unauthorized access to registered user's session:", {
+            sessionId,
+            userClerkId: user.clerk_id,
+            identitySubject: identity?.subject
+          });
+          return [];
+        }
+      } else {
+        if (identity) {
+          console.log("❌ PRIVACY VIOLATION: Authenticated user trying to access guest session:", {
+            sessionId,
+            identitySubject: identity.subject
+          });
+          return [];
+        }
+      }
+    }
+    
+    const allMessages = await ctx.db
+      .query("messages")
+      .withIndex("by_session_id", (q) => q.eq("session_id", sessionId))
+      .order("asc")
+      .collect();
+
+    console.log(`🔍 Found ${allMessages.length} messages for session ${sessionId}`);
+    
+    // Deduplicate messages by message_id (keep the latest by created_at)
+    const messageMap = new Map();
+    allMessages.forEach(msg => {
+      const existing = messageMap.get(msg.message_id);
+      if (!existing || msg.created_at > existing.created_at) {
+        messageMap.set(msg.message_id, msg);
+      }
+    });
+    
+    const deduplicatedMessages = Array.from(messageMap.values()).sort((a, b) => a.timestamp - b.timestamp);
+    
+    if (allMessages.length !== deduplicatedMessages.length) {
+      console.log(`⚠️ Removed ${allMessages.length - deduplicatedMessages.length} duplicate messages for session ${sessionId}`);
+    }
+
+    return deduplicatedMessages.map((msg, index) => ({
+      id: `${msg.message_id}_${index}`, // Use index to ensure uniqueness for React keys
+      role: msg.role,
+      content: msg.content,
+      hasAudio: msg.has_audio,
+      sources: msg.sources,  // Include sources from database
+      executionId: msg.execution_id,  // Include execution ID for message-source tracking
+      timestamp: msg.timestamp,
+    }));
+  },
+});
+
+// Get user sessions
+export const getUserSessions = query({
+  args: {
+    userId: v.optional(v.id("app_users")),
+    anonymousUuid: v.optional(v.string()),
+  },
+  handler: async (ctx, { userId, anonymousUuid }) => {
+    let sessions;
+    
+    if (userId) {
+      sessions = await ctx.db
+        .query("chat_sessions")
+        .withIndex("by_user_id", (q) => q.eq("user_id", userId))
+        .order("desc")
+        .collect();
+    } else if (anonymousUuid) {
+      sessions = await ctx.db
+        .query("chat_sessions")
+        .withIndex("by_anonymous_uuid", (q) => q.eq("anonymous_uuid", anonymousUuid))
+        .order("desc")
+        .collect();
+    } else {
+      return [];
+    }
+
+    return sessions;
+  },
+});
+
+// End session
+export const endSession = mutation({
+  args: {
+    sessionId: v.string(),
+  },
+  handler: async (ctx, { sessionId }) => {
+    const session = await ctx.db
+      .query("chat_sessions")
+      .withIndex("by_session_id", (q) => q.eq("session_id", sessionId))
+      .first();
+
+    if (session) {
+      await ctx.db.patch(session._id, {
+        ended_at: Date.now(),
+        is_active: false,
+      });
+    }
+  },
+});
+
+// Clean up duplicate messages in a session (utility function)
+export const cleanupDuplicateMessages = mutation({
+  args: {
+    sessionId: v.string(),
+  },
+  handler: async (ctx, { sessionId }) => {
+    const allMessages = await ctx.db
+      .query("messages")
+      .withIndex("by_session_id", (q) => q.eq("session_id", sessionId))
+      .collect();
+
+    const messageMap = new Map();
+    const duplicatesToDelete: any[] = [];
+
+    allMessages.forEach(msg => {
+      const existing = messageMap.get(msg.message_id);
+      if (!existing) {
+        messageMap.set(msg.message_id, msg);
+      } else {
+        // Keep the newer message, mark older for deletion
+        if (msg.created_at > existing.created_at) {
+          duplicatesToDelete.push(existing);
+          messageMap.set(msg.message_id, msg);
+        } else {
+          duplicatesToDelete.push(msg);
+        }
+      }
+    });
+
+    // Delete duplicates
+    for (const duplicate of duplicatesToDelete) {
+      await ctx.db.delete(duplicate._id);
+    }
+
+    console.log(`🧹 Cleaned up ${duplicatesToDelete.length} duplicate messages from session ${sessionId}`);
+    return { deletedCount: duplicatesToDelete.length };
+  },
+});
+
+// Debug query to check database state
+export const debugDatabaseState = query({
+  args: {},
+  handler: async (ctx) => {
+    const allSessions = await ctx.db.query("chat_sessions").collect();
+    const allMessages = await ctx.db.query("messages").collect();
+    const allUsers = await ctx.db.query("app_users").collect();
+    
+    return {
+      totalSessions: allSessions.length,
+      totalMessages: allMessages.length,
+      totalUsers: allUsers.length,
+      sessions: allSessions.map(s => ({
+        id: s._id,
+        sessionId: s.session_id,
+        userId: s.user_id,
+        messageCount: s.message_count,
+        startedAt: s.started_at
+      })),
+      messagesBySession: allSessions.map(s => ({
+        sessionId: s.session_id,
+        messages: allMessages.filter(m => m.session_id === s.session_id).length
+      })),
+      users: allUsers.map(u => ({
+        id: u._id,
+        clerkId: u.clerk_id,
+        isRegistered: u.is_registered,
+        totalConversations: u.total_conversations
+      }))
+    };
+  }
+});
+
+// Get user chats with history - ONLY for registered users
+export const getUserChatsWithHistory = query({
+  args: {
+    userId: v.optional(v.id("app_users")),
+    anonymousUuid: v.optional(v.string()),
+  },
+  handler: async (ctx, { userId, anonymousUuid }) => {
+    console.log("🔍 getUserChatsWithHistory called with:", { 
+      userId, 
+      anonymousUuid,
+      userIdType: typeof userId,
+      anonymousUuidType: typeof anonymousUuid,
+      historyPolicy: "REGISTERED USERS ONLY",
+      timestamp: new Date().toISOString(),
+      callSource: "PAGE_REFRESH_OR_INITIAL_LOAD"
+    });
+    
+    // Debug: Check total sessions in database
+    const allSessions = await ctx.db.query("chat_sessions").collect();
+    const allUsers = await ctx.db.query("app_users").collect();
+    console.log("🗄️ Database state:", {
+      totalSessions: allSessions.length,
+      totalUsers: allUsers.length,
+      sessionsForThisUser: allSessions.filter(s => s.user_id === userId).length,
+      allUserIds: allUsers.map(u => ({ id: u._id, clerkId: u.clerk_id, isRegistered: u.is_registered })),
+      targetUserId: userId
+    });
+    
+    const identity = await ctx.auth.getUserIdentity();
+    console.log("🔍 Convex identity:", {
+      hasIdentity: !!identity,
+      subject: identity?.subject,
+      tokenIdentifier: identity?.tokenIdentifier,
+      issuer: identity?.issuer
+    });
+    
+    // CRITICAL: Only registered users get persistent history
+    if (!userId || !identity) {
+      console.log("❌ No persistent history - registered users only:", { 
+        userId: !!userId, 
+        hasIdentity: !!identity,
+        reason: !userId ? "No userId provided" : "No Convex identity",
+        timestamp: new Date().toISOString()
+      });
+      return [];
+    }
+
+    // Get user object for verification
+    const user = await ctx.db.get(userId);
+    console.log("👤 User object:", { 
+      userId, 
+      userExists: !!user, 
+      isRegistered: user?.is_registered,
+      userClerkId: user?.clerk_id,
+      hasIdentity: !!identity,
+      identitySubject: identity?.subject
+    });
+    
+    if (!user || !user.is_registered) {
+      console.log("❌ History denied - user not found or not registered:", { userExists: !!user, isRegistered: user?.is_registered });
+      return [];
+    }
+
+    // STRICT SECURITY: Must be authenticated and match Clerk ID
+    if (user.clerk_id !== identity.subject) {
+      console.log("❌ PRIVACY VIOLATION: Trying to access someone else's chats:", { 
+        userClerkId: user.clerk_id, 
+        identitySubject: identity.subject
+      });
+      throw new Error("Unauthorized: You can only access your own chats");
+    }
+
+    console.log("✅ Registered user accessing their persistent history");
+    
+    const userSessions = await ctx.db
+      .query("chat_sessions")
+      .withIndex("by_user_id", (q) => q.eq("user_id", userId))
+      .order("desc") // Most recent first
+      .take(10); // Get 10 to filter down to 5 with messages (buffer for empty sessions)
+    
+    console.log("🔍 Sessions for registered user:", {
+      userId,
+      totalSessions: userSessions.length,
+      sessionsWithMessages: userSessions.filter(s => s.message_count > 0).length
+    });
+    
+    // Filter out empty sessions and limit to latest 5
+    const filteredSessions = userSessions
+      .filter(session => session.message_count > 0)
+      .slice(0, 5); // Limit to latest 5 conversations
+    
+    console.log("📊 Filtered and limited sessions:", { 
+      total: userSessions.length,
+      afterFiltering: userSessions.filter(s => s.message_count > 0).length,
+      finalCount: filteredSessions.length,
+      removedEmpty: userSessions.length - userSessions.filter(s => s.message_count > 0).length,
+      limitPolicy: "Latest 5 conversations only"
+    });
+    
+    // Already sorted by creation time (desc) from query
+    const sortedChats = filteredSessions;
+
+    // Format the response
+    const formattedChats = sortedChats.map((chat) => ({
+      id: chat.session_id,
+      title: `Chat from ${new Date(chat.started_at).toLocaleString()}`,
+      createdAt: new Date(chat.started_at).toISOString(),
+      userId: chat.user_id,
+      messageCount: chat.message_count,
+      visibility: "private" as const,
+    }));
+    
+    // Get titles from first messages
+    const chatsWithTitles = await Promise.all(
+      formattedChats.map(async (chat) => {
+        const firstMessage = await ctx.db
+          .query("messages")
+          .withIndex("by_session_id", q => q.eq("session_id", chat.id))
+          .order("asc")
+          .first();
+        
+        let title;
+        if (firstMessage?.content) {
+          title = firstMessage.content.substring(0, 50);
+          if (firstMessage.content.length > 50) {
+            title += "...";
+          }
+        } else {
+          title = "Untitled Chat";
+        }
+        
+        return { ...chat, title };
+      })
+    );
+
+    console.log("📊 Returning registered user chat history:", {
+      totalChats: chatsWithTitles.length,
+      userType: 'registered',
+      userId: userId
+    });
+    
+    return chatsWithTitles;
+  },
+});
+
+// Delete a chat session and all its messages with strict privacy checks
+export const deleteChat = mutation({
+  args: {
+    sessionId: v.string(),
+    userId: v.optional(v.id("app_users")),
+    anonymousUuid: v.optional(v.string()),
+  },
+  handler: async (ctx, { sessionId, userId, anonymousUuid }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    
+    // Verify ownership
+    const session = await ctx.db
+      .query("chat_sessions")
+      .withIndex("by_session_id", (q) => q.eq("session_id", sessionId))
+      .first();
+
+    if (!session) {
+      throw new Error("Chat session not found");
+    }
+
+    // Get user for privacy validation
+    if (session.user_id) {
+      const user = await ctx.db.get(session.user_id);
+      if (!user) {
+        throw new Error("User not found for session");
+      }
+      
+      // Strict privacy check
+      if (user.is_registered) {
+        if (!identity || user.clerk_id !== identity.subject) {
+          console.log("❌ PRIVACY VIOLATION: Unauthorized deletion attempt on registered user's session:", {
+            sessionId,
+            userClerkId: user.clerk_id,
+            identitySubject: identity?.subject
+          });
+          throw new Error("Unauthorized: You can only delete your own chats");
+        }
+      } else {
+        if (identity) {
+          console.log("❌ PRIVACY VIOLATION: Authenticated user trying to delete guest session:", {
+            sessionId,
+            identitySubject: identity.subject
+          });
+          throw new Error("Unauthorized: Cannot delete guest user's chats while authenticated");
+        }
+      }
+    }
+
+    // Additional legacy checks for backward compatibility
+    if (userId && session.user_id !== userId) {
+      throw new Error("Unauthorized: You don't own this chat");
+    }
+    
+    if (anonymousUuid && session.anonymous_uuid !== anonymousUuid) {
+      throw new Error("Unauthorized: You don't own this chat");
+    }
+
+    // Delete all messages in this session
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_session_id", (q) => q.eq("session_id", sessionId))
+      .collect();
+
+    for (const message of messages) {
+      await ctx.db.delete(message._id);
+    }
+
+    // Delete the session
+    await ctx.db.delete(session._id);
+
+    // Update user's conversation count
+    if (userId) {
+      const user = await ctx.db.get(userId);
+      if (user && user.total_conversations > 0) {
+        await ctx.db.patch(userId, {
+          total_conversations: user.total_conversations - 1,
+          updated_at: Date.now(),
+        });
+      }
+    }
+
+    return { success: true };
+  },
+});
+
+// Get first message of a chat to use as title
+export const getChatTitle = query({
+  args: {
+    sessionId: v.string(),
+  },
+  handler: async (ctx, { sessionId }) => {
+    const firstMessage = await ctx.db
+      .query("messages")
+      .withIndex("by_session_id", (q) => q.eq("session_id", sessionId))
+      .filter((q) => q.eq(q.field("role"), "user"))
+      .order("asc")
+      .first();
+
+    if (firstMessage) {
+      return firstMessage.content.slice(0, 50) + (firstMessage.content.length > 50 ? "..." : "");
+    }
+    
+    return "New Chat";
+  },
+});
+
+
+// Clean up old guest sessions and data (24 hours) - comprehensive cleanup
+export const cleanupOldGuestSessions = internalMutation({
+  handler: async (ctx) => {
+    const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
+    
+    console.log("🧹 Starting comprehensive cleanup of guest data older than 24 hours", {
+      cutoffTime: new Date(twentyFourHoursAgo).toISOString(),
+      cleanupPolicy: "24 hours after last_seen_at"
+    });
+    
+    // Find all guest users (non-registered)
+    const allGuestUsers = await ctx.db
+      .query("app_users")
+      .filter(q => q.eq(q.field("is_registered"), false))
+      .collect();
+    
+    const expiredGuestUsers = allGuestUsers.filter(user => user.last_seen_at < twentyFourHoursAgo);
+    
+    console.log(`📊 Guest user analysis:`, {
+      totalGuestUsers: allGuestUsers.length,
+      expiredGuestUsers: expiredGuestUsers.length,
+      willBeDeleted: expiredGuestUsers.length
+    });
+    
+    let totalDeletedSessions = 0;
+    let totalDeletedMessages = 0;
+    let totalDeletedUsers = 0;
+    let totalOrphanedSessions = 0;
+    let totalOrphanedMessages = 0;
+    let totalSearchesRecorded = 0;
+    let totalConversationsRecorded = 0;
+    
+    // 1. Clean up expired guest users and their data
+    for (const user of expiredGuestUsers) {
+      console.log(`🗑️ Deleting expired guest user data:`, {
+        userId: user._id,
+        anonymousUuid: user.anonymous_uuid,
+        lastSeen: new Date(user.last_seen_at).toISOString(),
+        hoursOld: Math.round((Date.now() - user.last_seen_at) / (1000 * 60 * 60)),
+        dataToDelete: {
+          conversations: user.total_conversations,
+          searches: user.total_searches,
+          messages: user.message_count
+        }
+      });
+      
+      // Track data before deletion for statistics
+      totalSearchesRecorded += user.total_searches || 0;
+      totalConversationsRecorded += user.total_conversations || 0;
+      
+      // Find all sessions for this user
+      const userSessions = await ctx.db
+        .query("chat_sessions")
+        .withIndex("by_user_id", q => q.eq("user_id", user._id))
+        .collect();
+      
+      console.log(`📋 Found ${userSessions.length} sessions for user ${user._id}`);
+      
+      for (const session of userSessions) {
+        // Delete all messages in this session
+        const messages = await ctx.db
+          .query("messages")
+          .withIndex("by_session_id", q => q.eq("session_id", session.session_id))
+          .collect();
+        
+        for (const message of messages) {
+          await ctx.db.delete(message._id);
+          totalDeletedMessages++;
+        }
+        
+        // Delete the session
+        await ctx.db.delete(session._id);
+        totalDeletedSessions++;
+      }
+      
+      // Delete the user
+      await ctx.db.delete(user._id);
+      totalDeletedUsers++;
+    }
+    
+    // 2. Clean up orphaned sessions (sessions with anonymous_uuid but no user_id)
+    const orphanedSessions = await ctx.db
+      .query("chat_sessions")
+      .filter(q => q.and(
+        q.eq(q.field("user_id"), undefined),
+        q.neq(q.field("anonymous_uuid"), undefined),
+        q.lt(q.field("started_at"), twentyFourHoursAgo)
+      ))
+      .collect();
+    
+    for (const session of orphanedSessions) {
+      console.log(`🗑️ Deleting orphaned guest session: ${session.session_id}`);
+      
+      // Delete all messages in this session
+      const messages = await ctx.db
+        .query("messages")
+        .withIndex("by_session_id", q => q.eq("session_id", session.session_id))
+        .collect();
+      
+      for (const message of messages) {
+        await ctx.db.delete(message._id);
+        totalOrphanedMessages++;
+      }
+      
+      // Delete the session
+      await ctx.db.delete(session._id);
+      totalOrphanedSessions++;
+    }
+    
+    // 3. Clean up any messages with anonymous_uuid but no user_id (double safety)
+    const orphanedMessages = await ctx.db
+      .query("messages")
+      .filter(q => q.and(
+        q.eq(q.field("user_id"), undefined),
+        q.neq(q.field("anonymous_uuid"), undefined),
+        q.lt(q.field("created_at"), twentyFourHoursAgo)
+      ))
+      .collect();
+    
+    for (const message of orphanedMessages) {
+      await ctx.db.delete(message._id);
+      totalOrphanedMessages++;
+    }
+    
+    const totalCleanedItems = totalDeletedUsers + totalDeletedSessions + totalDeletedMessages + totalOrphanedSessions + totalOrphanedMessages;
+    
+    console.log(`✅ Comprehensive guest cleanup complete:`, {
+      deletedUsers: totalDeletedUsers,
+      deletedSessions: totalDeletedSessions,
+      deletedMessages: totalDeletedMessages,
+      orphanedSessions: totalOrphanedSessions,
+      orphanedMessages: totalOrphanedMessages,
+      totalItemsCleaned: totalCleanedItems,
+      dataRecorded: {
+        totalSearchesCleared: totalSearchesRecorded,
+        totalConversationsCleared: totalConversationsRecorded
+      },
+      cleanupTime: new Date().toISOString(),
+      nextCleanupIn: "1 hour"
+    });
+    
+    // Log database health after cleanup
+    const remainingGuestUsers = await ctx.db
+      .query("app_users")
+      .filter(q => q.eq(q.field("is_registered"), false))
+      .collect();
+    
+    console.log(`📊 Database health after cleanup:`, {
+      remainingGuestUsers: remainingGuestUsers.length,
+      oldestGuestUser: remainingGuestUsers.length > 0 
+        ? new Date(Math.min(...remainingGuestUsers.map(u => u.last_seen_at))).toISOString()
+        : 'none',
+      databaseStatus: 'clean'
+    });
+    
+    return {
+      deletedUsers: totalDeletedUsers,
+      deletedSessions: totalDeletedSessions,
+      deletedMessages: totalDeletedMessages,
+      orphanedSessions: totalOrphanedSessions,
+      orphanedMessages: totalOrphanedMessages,
+      totalItemsCleaned: totalCleanedItems,
+      searchesCleared: totalSearchesRecorded,
+      conversationsCleared: totalConversationsRecorded,
+      remainingGuestUsers: remainingGuestUsers.length
+    };
+  },
+});
+
+// Monitor guest data levels (for admin/debugging)
+export const getGuestDataStatus = query({
+  handler: async (ctx) => {
+    const now = Date.now();
+    const twentyFourHoursAgo = now - (24 * 60 * 60 * 1000);
+    
+    // Get all guest users
+    const allGuestUsers = await ctx.db
+      .query("app_users")
+      .filter(q => q.eq(q.field("is_registered"), false))
+      .collect();
+    
+    // Categorize by age
+    const activeGuests = allGuestUsers.filter(u => u.last_seen_at >= twentyFourHoursAgo);
+    const expiredGuests = allGuestUsers.filter(u => u.last_seen_at < twentyFourHoursAgo);
+    
+    // Get session and message counts
+    let totalGuestSessions = 0;
+    let totalGuestMessages = 0;
+    
+    for (const user of allGuestUsers) {
+      const sessions = await ctx.db
+        .query("chat_sessions")
+        .withIndex("by_user_id", q => q.eq("user_id", user._id))
+        .collect();
+      totalGuestSessions += sessions.length;
+      
+      for (const session of sessions) {
+        const messages = await ctx.db
+          .query("messages")
+          .withIndex("by_session_id", q => q.eq("session_id", session.session_id))
+          .collect();
+        totalGuestMessages += messages.length;
+      }
+    }
+    
+    // Calculate total activity
+    const totalSearches = allGuestUsers.reduce((sum, u) => sum + (u.total_searches || 0), 0);
+    const totalConversations = allGuestUsers.reduce((sum, u) => sum + (u.total_conversations || 0), 0);
+    
+    return {
+      timestamp: new Date().toISOString(),
+      guestUsers: {
+        total: allGuestUsers.length,
+        active: activeGuests.length,
+        expired: expiredGuests.length,
+        nextCleanupWillRemove: expiredGuests.length
+      },
+      guestData: {
+        sessions: totalGuestSessions,
+        messages: totalGuestMessages,
+        searches: totalSearches,
+        conversations: totalConversations
+      },
+      databaseHealth: {
+        status: expiredGuests.length > 50 ? 'needs_cleanup' : 'healthy',
+        recommendation: expiredGuests.length > 50 
+          ? 'Consider running manual cleanup' 
+          : 'Automatic cleanup is maintaining database health'
+      },
+      oldestGuestUser: allGuestUsers.length > 0 
+        ? new Date(Math.min(...allGuestUsers.map(u => u.last_seen_at))).toISOString()
+        : null
+    };
+  },
+});
+
+// Manual cleanup trigger (for admin/debugging)
+export const runGuestDataCleanupNow = mutation({
+  handler: async (ctx): Promise<{
+    message: string;
+    scheduledJobId: any;
+    timestamp: string;
+  }> => {
+    console.log("🚀 Manual guest data cleanup triggered");
+    
+    // Call the same cleanup function that cron uses
+    const result = await ctx.scheduler.runAfter(0, internal.agent.cleanupOldGuestSessions);
+    
+    return {
+      message: "Guest data cleanup initiated manually",
+      scheduledJobId: result,
+      timestamp: new Date().toISOString()
+    };
+  },
+});
+
+ 
