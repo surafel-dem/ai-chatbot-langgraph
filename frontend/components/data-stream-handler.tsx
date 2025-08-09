@@ -18,6 +18,19 @@ export function DataStreamHandler() {
     lastProcessedIndex.current = dataStream.length - 1;
 
     newDeltas.forEach((delta) => {
+      // Handle orchestrator-specific parts without disrupting existing artifact logic
+      if (delta.type === 'data-part' && typeof delta.data === 'object' && delta.data) {
+        const kind = (delta.data as any).type;
+        if (kind === 'planner-state') {
+          // TODO: forward planner state to a UI store/panel when added
+        }
+        if (kind === 'source-url') {
+          // TODO: append source to a citations panel/store when added
+        }
+        if (kind === 'finish-step') {
+          // TODO: update step progress indicator when added
+        }
+      }
       const artifactDefinition = artifactDefinitions.find(
         (artifactDefinition) => artifactDefinition.kind === artifact.kind,
       );
