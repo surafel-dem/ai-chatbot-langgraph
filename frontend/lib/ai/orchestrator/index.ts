@@ -35,8 +35,16 @@ export async function runOrchestrator(ctx: any) {
   out.textDelta('Starting orchestrator...\n');
 
   let stepNum = 0;
+  let plannedOnce = false;
+  let executedSpecialist = false;
   while (stepNum++ < MAX_STEPS && !ctx.signal.aborted) {
-    const route = await routerAgent(ctx);
+    let route = await routerAgent(ctx);
+
+    // Prevent infinite plan loops: if planner already ran and router still says plan, force purchase_advice
+    if (route.next === 'plan' && plannedOnce) {
+      route = { next: 'purchase_advice', reason: 'forced_after_plan' } as any;
+    }
+
     out.textDelta(`Router selected: ${route.next}\n`);
     if (route.next === 'finalize') break;
 
@@ -64,6 +72,10 @@ export async function runOrchestrator(ctx: any) {
 
       out.finishStep();
       await endStep(ctx.convex, { stepId });
+
+      if (name === 'plan') plannedOnce = true;
+      if (name === 'purchase_advice') executedSpecialist = true;
+      if (executedSpecialist) break; // end after first specialist for now
     } catch (e: any) {
       out.textDelta(`Error in step ${name}: ${String(e?.message || e)}\n`);
       await endStep(ctx.convex, { stepId, error: String(e?.message || e) });

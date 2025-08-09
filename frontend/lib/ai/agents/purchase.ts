@@ -52,7 +52,7 @@ export async function purchaseAdviceAgent(ctx: RunContext) {
       {
         role: 'system',
         content:
-          'You are the PURCHASE ADVICE specialist. Combine specs, price bands, and web reviews for Ireland. Provide trims to consider, pros/cons, and value judgement. Keep it concise and actionable.',
+          'You are the PURCHASE ADVICE specialist. Combine specs, price bands, and web reviews for Ireland. Provide trims to consider, pros/cons, and value judgement. Output must be concise, non-repetitive, and in plain paragraphs with short headings. Avoid repeating phrases or list numbers. Do not echo the user input.',
       },
     ],
     experimental_transform: smoothStream({ chunking: 'word' }),

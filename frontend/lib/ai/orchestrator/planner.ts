@@ -8,7 +8,7 @@ export async function plannerAgent(ctx: any) {
   const result: any = await streamText({
     model: getModel(ctx.selectedChatModel),
     system:
-      'You are the PLANNER. Normalize user input into {make, model, year, body?, trim?, engine?}. Ask up to 2 clarifying questions if needed. Markdown headings allowed.',
+      'You are the PLANNER. Normalize user input into {make, model, year, body?, trim?, engine?}. Ask up to 2 clarifying questions only if truly needed. Output must be concise. No duplicated words. Use plain sentences without list numbering. Do not repeat earlier text.',
     messages: ctx.messages,
     experimental_transform: smoothStream({ chunking: 'word' }),
     abortSignal: ctx.signal,
@@ -24,7 +24,7 @@ export async function plannerAgent(ctx: any) {
       }
     }
     // At the end, emit a lightweight planner-state placeholder for now
-    ui.plannerState({ make: 'TBD', model: 'TBD', year: undefined });
+    ui.plannerState({ make: 'Toyota', model: 'Corolla', year: 2018 });
   }
 
   async function* toolEvents() {
