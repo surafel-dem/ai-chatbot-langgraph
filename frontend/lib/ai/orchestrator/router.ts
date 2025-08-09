@@ -16,7 +16,8 @@ export async function routerAgent(ctx: any) {
     }
   } catch {}
 
-  const res: any = await streamText({
+  const decide = async () => {
+    const res: any = await streamText({
     model: getModel(ctx.selectedChatModel),
     system:
       'You are the ROUTER for a car analysis assistant. Decide the next step. Use the choose tool to return JSON { next, reason }.',
@@ -30,11 +31,23 @@ export async function routerAgent(ctx: any) {
     },
     toolChoice: 'required',
     abortSignal: ctx.signal,
-  });
+    });
 
-  const pick = await res.toolCalls().then((calls: any[]) => calls.find((c) => c.toolName === 'choose')?.args);
-  // Prefer starting with a planning pass in case of uncertainty
-  return NextSchema.parse(pick ?? { next: 'plan' });
+    const pick = await res
+      .toolCalls()
+      .then((calls: any[]) => calls.find((c) => c.toolName === 'choose')?.args);
+    return NextSchema.parse(pick ?? { next: 'plan' });
+  };
+
+  // Fallback to plan after 2 seconds if the model is unavailable
+  try {
+    return await Promise.race([
+      decide(),
+      new Promise<any>((resolve) => setTimeout(() => resolve({ next: 'plan' as const, reason: 'timeout' }), 2000)),
+    ]);
+  } catch {
+    return { next: 'plan' as const, reason: 'error' };
+  }
 }
 
 

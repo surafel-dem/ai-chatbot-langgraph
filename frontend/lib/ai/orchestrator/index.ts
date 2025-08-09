@@ -8,15 +8,15 @@ import { purchaseAdviceAgent } from '../agents/purchase';
 const specialists: Record<string, any> = {
   plan: plannerAgent,
   purchase_advice: purchaseAdviceAgent,
-  running_cost: async () => ({
+  running_cost: async (ctx: any) => ({
     textStream: (async function* () {
-      yield 'Running cost specialist is not implemented yet.\n';
+      yield 'Running cost specialist is not implemented yet. Passing back to router...\n';
     })(),
     toolEvents: (async function* () {})(),
   }),
-  reliability: async () => ({
+  reliability: async (ctx: any) => ({
     textStream: (async function* () {
-      yield 'Reliability specialist is not implemented yet.\n';
+      yield 'Reliability specialist is not implemented yet. Passing back to router...\n';
     })(),
     toolEvents: (async function* () {})(),
   }),
