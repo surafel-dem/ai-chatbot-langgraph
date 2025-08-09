@@ -21,6 +21,7 @@ import { requestSuggestions } from '@/lib/ai/tools/request-suggestions';
 import { getWeather } from '@/lib/ai/tools/get-weather';
 import { myProvider } from '@/lib/ai/providers';
 import { entitlementsByUserType } from '@/lib/ai/entitlements';
+import { runOrchestrator } from '@/lib/ai/orchestrator';
 import { postRequestBodySchema } from './schema';
 import { systemPrompt, type RequestHints } from '@/lib/ai/prompts';
 import type { AuthSession, UserType } from '@/lib/auth';
@@ -162,37 +163,65 @@ export const POST = withOptionalAuth(async ({ convex, userId, request }) => {
   await convex.mutation(api.chats.startStream, { stream_id: streamId, chat_id: id });
 
   const stream = createUIMessageStream({
-    execute: ({ writer: dataStream }) => {
-      const result = streamText({
-        model: myProvider.languageModel(selectedChatModel),
-        system: systemPrompt({ selectedChatModel, requestHints }),
-        messages: convertToModelMessages(uiMessages),
-        stopWhen: stepCountIs(5),
-        experimental_activeTools:
-          selectedChatModel === 'chat-model-reasoning'
-            ? []
-            : [
-                'getWeather',
-                'createDocument',
-                'updateDocument',
-                'requestSuggestions',
-              ],
-        experimental_transform: smoothStream({ chunking: 'word' }),
-        tools: {
-          getWeather,
-          createDocument: createDocument({ session, dataStream }),
-          updateDocument: updateDocument({ session, dataStream }),
-          requestSuggestions: requestSuggestions({ session, dataStream }),
-        },
-      });
+    execute: async ({ writer: dataStream }) => {
+      if (featureFlags.agentsOrchestrator) {
+        // Orchestrated path
+        const runId = await convex.mutation(api.runs.startRun, {
+          chat_id: id,
+          user_id: userId ?? guestId ?? '',
+        });
 
-      result.consumeStream();
+        try {
+          const ac = new AbortController();
+          await runOrchestrator({
+            ui: dataStream,
+            messages: convertToModelMessages(uiMessages),
+            chatId: id,
+            runId,
+            userId: userId ?? guestId ?? '',
+            convex,
+            selectedChatModel,
+            requestHints,
+            userType,
+            signal: ac.signal,
+          });
+        } finally {
+          await convex.mutation(api.runs.endRun, { run_id: runId });
+          dataStream.done();
+        }
+      } else {
+        // Existing chat-only path (kept intact)
+        const result = streamText({
+          model: myProvider.languageModel(selectedChatModel),
+          system: systemPrompt({ selectedChatModel, requestHints }),
+          messages: convertToModelMessages(uiMessages),
+          stopWhen: stepCountIs(5),
+          experimental_activeTools:
+            selectedChatModel === 'chat-model-reasoning'
+              ? []
+              : [
+                  'getWeather',
+                  'createDocument',
+                  'updateDocument',
+                  'requestSuggestions',
+                ],
+          experimental_transform: smoothStream({ chunking: 'word' }),
+          tools: {
+            getWeather,
+            createDocument: createDocument({ session, dataStream }),
+            updateDocument: updateDocument({ session, dataStream }),
+            requestSuggestions: requestSuggestions({ session, dataStream }),
+          },
+        });
 
-      dataStream.merge(
-        result.toUIMessageStream({
-          sendReasoning: true,
-        }),
-      );
+        result.consumeStream();
+
+        dataStream.merge(
+          result.toUIMessageStream({
+            sendReasoning: true,
+          }),
+        );
+      }
     },
     generateId: generateUUID,
     onFinish: async ({ messages }) => {
