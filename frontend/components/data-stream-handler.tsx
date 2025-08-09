@@ -23,6 +23,9 @@ export function DataStreamHandler() {
 
     newDeltas.forEach((delta) => {
       // Handle orchestrator-specific parts without disrupting existing artifact logic
+      if (delta.type === 'data-textDelta') {
+        // AssistantStream listens to these; nothing else to do here
+      }
       if (delta.type === 'data-part' && typeof delta.data === 'object' && delta.data) {
         const kind = (delta.data as any).type;
         if (kind === 'planner-state') {

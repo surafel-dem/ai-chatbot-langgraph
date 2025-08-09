@@ -10,8 +10,8 @@ export function AssistantStream() {
   const text = useMemo(() => {
     if (!featureFlags.agentsOrchestrator) return '';
     return dataStream
-      .filter((p: any) => p.type === 'text-delta' && typeof (p as any).text === 'string')
-      .map((p: any) => p.text as string)
+      .filter((p: any) => p.type === 'data-textDelta' && typeof (p as any).data === 'string')
+      .map((p: any) => p.data as string)
       .join('');
   }, [dataStream]);
 

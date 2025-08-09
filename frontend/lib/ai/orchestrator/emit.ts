@@ -1,5 +1,5 @@
 export const emit = (ui: any) => ({
-  textDelta: (text: string) => ui.write({ type: 'text-delta', text }),
+  textDelta: (text: string) => ui.write({ type: 'data-textDelta', data: text, transient: true }),
   toolStart: (name: string, input: unknown) =>
     ui.write({ type: 'data-part', data: { type: 'tool-input-available', toolName: name, toolInput: input }, transient: true }),
   toolResult: (name: string, output: unknown) =>
