@@ -3,17 +3,11 @@ import { startStep, endStep, addSources } from './state';
 import { routerAgent } from './router';
 import { plannerAgent } from './planner';
 import { MAX_STEPS } from './budget';
+import { purchaseAdviceAgent } from '../agents/purchase';
 
 const specialists: Record<string, any> = {
   plan: plannerAgent,
-  purchase_advice: async (ctx: any) => ({
-    // placeholder; will be replaced by full specialist
-    textStream: (async function* () {
-      yield 'Starting Purchase Advice...\n';
-      yield 'This specialist will analyze trims, value, and alternatives.\n';
-    })(),
-    toolEvents: (async function* () {})(),
-  }),
+  purchase_advice: purchaseAdviceAgent,
   running_cost: async () => ({
     textStream: (async function* () {
       yield 'Running cost specialist is not implemented yet.\n';
