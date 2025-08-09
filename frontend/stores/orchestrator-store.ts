@@ -1,0 +1,36 @@
+import { create } from 'zustand';
+
+export type PlannerState = {
+  make?: string;
+  model?: string;
+  year?: number;
+  body?: string;
+  trim?: string;
+  engine?: string;
+};
+
+export type SourceItem = { url: string; title?: string };
+
+type OrchestratorState = {
+  plannerState: PlannerState | null;
+  sources: SourceItem[];
+  finishedSteps: number;
+  setPlannerState: (p: PlannerState) => void;
+  addSource: (s: SourceItem) => void;
+  addSources: (s: SourceItem[]) => void;
+  markStepFinished: () => void;
+  reset: () => void;
+};
+
+export const useOrchestratorStore = create<OrchestratorState>((set) => ({
+  plannerState: null,
+  sources: [],
+  finishedSteps: 0,
+  setPlannerState: (p) => set({ plannerState: p }),
+  addSource: (s) => set((st) => ({ sources: [...st.sources, s] })),
+  addSources: (arr) => set((st) => ({ sources: [...st.sources, ...arr] })),
+  markStepFinished: () => set((st) => ({ finishedSteps: st.finishedSteps + 1 })),
+  reset: () => set({ plannerState: null, sources: [], finishedSteps: 0 }),
+}));
+
+

@@ -4,12 +4,16 @@ import { useEffect, useRef } from 'react';
 import { artifactDefinitions } from './artifact';
 import { initialArtifactData, useArtifact } from '@/hooks/use-artifact';
 import { useDataStream } from './data-stream-provider';
+import { useOrchestratorStore } from '@/stores/orchestrator-store';
 
 export function DataStreamHandler() {
   const { dataStream } = useDataStream();
 
   const { artifact, setArtifact, setMetadata } = useArtifact();
   const lastProcessedIndex = useRef(-1);
+  const setPlanner = useOrchestratorStore((s) => s.setPlannerState);
+  const addSource = useOrchestratorStore((s) => s.addSource);
+  const markStepFinished = useOrchestratorStore((s) => s.markStepFinished);
 
   useEffect(() => {
     if (!dataStream?.length) return;
@@ -22,13 +26,13 @@ export function DataStreamHandler() {
       if (delta.type === 'data-part' && typeof delta.data === 'object' && delta.data) {
         const kind = (delta.data as any).type;
         if (kind === 'planner-state') {
-          // TODO: forward planner state to a UI store/panel when added
+          setPlanner((delta.data as any).selectedCar ?? (delta.data as any));
         }
         if (kind === 'source-url') {
-          // TODO: append source to a citations panel/store when added
+          addSource({ url: (delta.data as any).url, title: (delta.data as any).title });
         }
         if (kind === 'finish-step') {
-          // TODO: update step progress indicator when added
+          markStepFinished();
         }
       }
       const artifactDefinition = artifactDefinitions.find(
