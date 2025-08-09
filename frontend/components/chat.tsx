@@ -25,6 +25,9 @@ import { useDataStream } from './data-stream-provider';
 import { useUser } from '@clerk/nextjs';
 import { featureFlags } from '@/lib/feature-flags';
 import { useOrchestratorStore } from '@/stores/orchestrator-store';
+import { PlannerPanel } from './orchestrator/planner-panel';
+import { SourcesPanel } from './orchestrator/sources-panel';
+import { ProgressPanel } from './orchestrator/progress-panel';
 
 export function Chat({
   id,
@@ -164,15 +167,11 @@ export function Chat({
         />
 
         {featureFlags.agentsOrchestrator && (
-          <div className="mx-auto w-full md:max-w-3xl px-4 pb-2 text-xs text-muted-foreground">
-            {plannerState && (
-              <div>
-                Planning: {plannerState.make ?? ''} {plannerState.model ?? ''}{' '}
-                {plannerState.year ?? ''}
-              </div>
-            )}
-            {finishedSteps > 0 && <div>Steps completed: {finishedSteps}</div>}
-          </div>
+          <>
+            <PlannerPanel />
+            <SourcesPanel />
+            <ProgressPanel />
+          </>
         )}
 
         <form className="flex mx-auto px-4 bg-background pb-4 md:pb-6 gap-2 w-full md:max-w-3xl">
