@@ -29,6 +29,7 @@ import { PlannerPanel } from './orchestrator/planner-panel';
 import { SourcesPanel } from './orchestrator/sources-panel';
 import { ProgressPanel } from './orchestrator/progress-panel';
 import { AssistantStream } from './orchestrator/assistant-stream';
+import { PlannerHint } from './orchestrator/planner-hint';
 
 export function Chat({
   id,
@@ -166,6 +167,8 @@ export function Chat({
           isReadonly={isReadonly}
           isArtifactVisible={isArtifactVisible}
         />
+
+        {featureFlags.agentsOrchestrator && <PlannerHint />}
 
         {featureFlags.agentsOrchestrator && (
           <>

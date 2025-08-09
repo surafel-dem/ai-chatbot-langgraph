@@ -6,6 +6,7 @@ import { memo } from 'react';
 import type { UseChatHelpers } from '@ai-sdk/react';
 import type { VisibilityType } from './visibility-selector';
 import type { ChatMessage } from '@/lib/types';
+import { featureFlags } from '@/lib/feature-flags';
 
 interface SuggestedActionsProps {
   chatId: string;
@@ -18,28 +19,51 @@ function PureSuggestedActions({
   sendMessage,
   selectedVisibilityType,
 }: SuggestedActionsProps) {
-  const suggestedActions = [
-    {
-      title: 'What are the advantages',
-      label: 'of using Next.js?',
-      action: 'What are the advantages of using Next.js?',
-    },
-    {
-      title: 'Write code to',
-      label: `demonstrate djikstra's algorithm`,
-      action: `Write code to demonstrate djikstra's algorithm`,
-    },
-    {
-      title: 'Help me write an essay',
-      label: `about silicon valley`,
-      action: `Help me write an essay about silicon valley`,
-    },
-    {
-      title: 'What is the weather',
-      label: 'in San Francisco?',
-      action: 'What is the weather in San Francisco?',
-    },
-  ];
+  const suggestedActions = featureFlags.agentsOrchestrator
+    ? [
+        {
+          title: 'Help me choose a car',
+          label: 'e.g., 2018 Toyota Corolla in Ireland',
+          action: 'Help me choose a 2018 Toyota Corolla to buy in Ireland',
+        },
+        {
+          title: 'Estimate running costs',
+          label: 'for [make model year]',
+          action: 'Estimate running costs for 2018 Toyota Corolla in Ireland',
+        },
+        {
+          title: 'Check reliability',
+          label: 'common issues and recalls',
+          action: 'Check reliability and common issues for Toyota Corolla 2018',
+        },
+        {
+          title: 'Compare two cars',
+          label: '[car A] vs [car B] in Ireland',
+          action: 'Compare 2018 Toyota Corolla vs 2018 Honda Civic in Ireland',
+        },
+      ]
+    : [
+        {
+          title: 'What are the advantages',
+          label: 'of using Next.js?',
+          action: 'What are the advantages of using Next.js?',
+        },
+        {
+          title: 'Write code to',
+          label: `demonstrate djikstra's algorithm`,
+          action: `Write code to demonstrate djikstra's algorithm`,
+        },
+        {
+          title: 'Help me write an essay',
+          label: `about silicon valley`,
+          action: `Help me write an essay about silicon valley`,
+        },
+        {
+          title: 'What is the weather',
+          label: 'in San Francisco?',
+          action: 'What is the weather in San Francisco?',
+        },
+      ];
 
   return (
     <div
