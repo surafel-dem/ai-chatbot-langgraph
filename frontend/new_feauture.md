@@ -26,6 +26,46 @@ You will create a PR with the **exact file structure and code below**. Be precis
 
 ---
 
+## Repo‑aware refinements (must read before implementing)
+
+These updates align the plan with the current codebase (Next.js 15 + AI SDK + Convex + Clerk) and UI we intend to keep (greeting, suggestions grid, composer, history sidebar, artifacts).
+
+### Feature flags
+
+- `lib/feature-flags.ts`
+  - `agentsOrchestrator: true` (new)
+  - `credits: true` (already present)
+
+### Stream contract (UI data parts)
+
+Agents MUST emit only these parts so the existing stream fan‑in remains simple:
+
+- `text-delta` (live text)
+- `tool-input-available`, `tool-output-available`
+- `source-url` (url, title?)
+- `finish-step`
+- `planner-state` (new, JSON): `{ selectedCar: { make, model, year, trim?, engine? } }`
+
+Error policy: specialists should emit narrative even if a tool fails (emit a `tool-output-available` error payload) and continue; only stop on `AbortSignal`.
+
+### Usage/budget accounting
+
+- Capture AI SDK usage per step and patch both:
+  - `steps.token_in`, `steps.token_out`
+  - accumulate into `runs.token_in`, `runs.token_out`
+- Keep `MAX_STEPS` (default 8) and per‑tool timeouts (default 12s) with a tiny retry helper; wire into agents.
+
+### Model adapter
+
+- Add `/frontend/lib/ai/model.ts`:
+  ```ts
+  import { myProvider } from '@/lib/ai/providers';
+  export const getModel = (selected?: string) =>
+    (myProvider as any).languageModel?.(selected) ?? (myProvider as any).chatModel?.(selected);
+  ```
+
+---
+
 ## High-Level Steps
 
 1. Add Convex schema + functions for orchestration telemetry.
@@ -113,6 +153,8 @@ export default defineSchema({
   }).index("by_run", ["run_id"]),
 });
 ```
+
+> Add token usage after each step using AI SDK `usage` metadata; patch the current `steps` row and increment `runs` totals.
 
 ### Convex functions for telemetry
 
@@ -462,6 +504,15 @@ export async function runOrchestrator(ctx: any) {
 
 ---
 
+## 2.8 API glue (repo‑aware)
+
+- File: `/frontend/app/(chat)/api/chat/route.ts`
+- Under `featureFlags.agentsOrchestrator`, replace the direct `streamText` block with a call to `runOrchestrator` inside `createUIMessageStream`.
+- Keep existing Clerk auth, chat creation/saving, and error handling unchanged.
+- Optional follow‑up: add `resumable-stream` like the deep‑research example for reload‑resilience.
+
+---
+
 ## 3) Prompts
 
 ```ts
@@ -806,6 +857,45 @@ export default function AnalysisPicker({ onPick }: { onPick: (kind: "purchase"|"
 * Add **resumable stream** like the deep-research repo (optional).
 * Replace stubs in `priceLookup`/`specLookup` with real providers.
 * Add Playwright tests to assert stream event order and router choices.
+
+---
+
+## 11) UI Integration Plan (repo‑aware)
+
+We keep the current chat UI (greeting, suggestions grid, composer, history sidebar, artifact overlay). New panels mount conditionally without routing changes.
+
+### Components (new)
+
+```
+/frontend/components/Orchestrator/
+  HeroQuickActions.tsx   # badge + Start Planning / Try Purchase Advice
+  PlannerPanel.tsx       # search input + image drop + progress + tips + suggested matches
+  ConfirmPanel.tsx       # selected car summary + quick edits + CTAs
+  AnalysisPanel.tsx      # left: streaming markdown; right: sources + next actions
+```
+
+### Mount points
+
+- `components/messages.tsx`
+  - On empty chat (no messages) + orchestrator flag ON → render `HeroQuickActions` above the suggestions grid.
+  - When mode = `planning` → render `PlannerPanel` in the main content area (keeps composer and suggestions intact).
+  - When mode = `confirm` → render `ConfirmPanel`.
+  - When mode = `analysis:*` → render `AnalysisPanel`.
+
+- No changes to composer (`MultimodalInput`), suggestions (`SuggestedActions`), history sidebar, or artifact overlay behavior.
+
+### State
+
+- `lib/stores/orchestrator-store.ts` (Zustand)
+  - `mode: 'idle' | 'planning' | 'confirm' | 'analysis:purchase' | 'analysis:running' | 'analysis:reliability'`
+  - `selectedCar`, `sources`, `progress`
+
+### SSE wiring
+
+- Extend the existing data stream handler to route:
+  - `planner-state` → set `selectedCar` and switch to `confirm`
+  - `source-url` → append to sources
+  - `finish-step` → mark step complete
 
 ---
 
