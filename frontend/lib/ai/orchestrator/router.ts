@@ -8,6 +8,14 @@ const NextSchema = z.object({
 });
 
 export async function routerAgent(ctx: any) {
+  // If the last user message contains an orchestrator tag, prefer planning
+  try {
+    const last = ctx.messages?.slice()?.reverse()?.find((m: any) => m.role === 'user');
+    if (last && typeof last.content === 'string' && last.content.includes('[orchestrator]')) {
+      return { next: 'plan' as const, reason: 'forced_by_ui' };
+    }
+  } catch {}
+
   const res: any = await streamText({
     model: getModel(ctx.selectedChatModel),
     system:

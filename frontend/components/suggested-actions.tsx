@@ -84,9 +84,12 @@ function PureSuggestedActions({
             onClick={async () => {
               window.history.replaceState({}, '', `/chat/${chatId}`);
 
+              // Force orchestrator mode by tagging the message
               sendMessage({
                 role: 'user',
-                parts: [{ type: 'text', text: suggestedAction.action }],
+                parts: [
+                  { type: 'text', text: `[orchestrator] ${suggestedAction.action}` },
+                ],
               });
             }}
             className="text-left border rounded-xl px-4 py-3.5 text-sm flex-1 gap-1 sm:flex-col w-full h-auto justify-start items-start"

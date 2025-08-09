@@ -31,9 +31,13 @@ const specialists: Record<string, any> = {
 export async function runOrchestrator(ctx: any) {
   const out = emit(ctx.ui);
 
+  // Debug visibility: prove orchestrator path is running
+  out.textDelta('Starting orchestrator...\n');
+
   let stepNum = 0;
   while (stepNum++ < MAX_STEPS && !ctx.signal.aborted) {
     const route = await routerAgent(ctx);
+    out.textDelta(`Router selected: ${route.next}\n`);
     if (route.next === 'finalize') break;
 
     const role = route.next === 'plan' ? 'planner' : 'specialist';
@@ -61,6 +65,7 @@ export async function runOrchestrator(ctx: any) {
       out.finishStep();
       await endStep(ctx.convex, { stepId });
     } catch (e: any) {
+      out.textDelta(`Error in step ${name}: ${String(e?.message || e)}\n`);
       await endStep(ctx.convex, { stepId, error: String(e?.message || e) });
       throw e;
     }
