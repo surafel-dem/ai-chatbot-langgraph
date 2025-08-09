@@ -5,6 +5,7 @@ import { artifactDefinitions } from './artifact';
 import { initialArtifactData, useArtifact } from '@/hooks/use-artifact';
 import { useDataStream } from './data-stream-provider';
 import { useOrchestratorStore } from '@/stores/orchestrator-store';
+import { featureFlags } from '@/lib/feature-flags';
 
 export function DataStreamHandler() {
   const { dataStream } = useDataStream();
@@ -38,16 +39,18 @@ export function DataStreamHandler() {
           markStepFinished();
         }
       }
-      const artifactDefinition = artifactDefinitions.find(
-        (artifactDefinition) => artifactDefinition.kind === artifact.kind,
-      );
-
-      if (artifactDefinition?.onStreamPart) {
-        artifactDefinition.onStreamPart({
-          streamPart: delta,
-          setArtifact,
-          setMetadata,
-        });
+      // Suppress artifact-driven modal opening during orchestrator mode
+      if (!featureFlags.agentsOrchestrator) {
+        const artifactDefinition = artifactDefinitions.find(
+          (artifactDefinition) => artifactDefinition.kind === artifact.kind,
+        );
+        if (artifactDefinition?.onStreamPart) {
+          artifactDefinition.onStreamPart({
+            streamPart: delta,
+            setArtifact,
+            setMetadata,
+          });
+        }
       }
 
       setArtifact((draftArtifact) => {

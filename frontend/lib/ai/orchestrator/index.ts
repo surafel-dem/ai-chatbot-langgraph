@@ -32,7 +32,7 @@ export async function runOrchestrator(ctx: any) {
   const out = emit(ctx.ui);
 
   // Debug visibility: prove orchestrator path is running
-  out.textDelta('Starting orchestrator...\n');
+  out.status('Starting orchestrator...');
 
   let stepNum = 0;
   let plannedOnce = false;
@@ -45,7 +45,7 @@ export async function runOrchestrator(ctx: any) {
       route = { next: 'purchase_advice', reason: 'forced_after_plan' } as any;
     }
 
-    out.textDelta(`Router selected: ${route.next}\n`);
+    out.status(`Router selected: ${route.next}`);
     if (route.next === 'finalize') break;
 
     const role = route.next === 'plan' ? 'planner' : 'specialist';

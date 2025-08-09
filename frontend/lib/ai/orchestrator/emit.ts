@@ -9,6 +9,8 @@ export const emit = (ui: any) => ({
   plannerState: (selectedCar: any) =>
     ui.write({ type: 'data-part', data: { type: 'planner-state', selectedCar }, transient: true }),
   finishStep: () => ui.write({ type: 'data-part', data: { type: 'finish-step' }, transient: true }),
+  status: (text: string, level?: 'info' | 'warn' | 'error') =>
+    ui.write({ type: 'data-part', data: { type: 'status', text, level }, transient: true }),
 });
 
 
