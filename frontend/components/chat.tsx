@@ -28,6 +28,7 @@ import { useOrchestratorStore } from '@/stores/orchestrator-store';
 import { PlannerPanel } from './orchestrator/planner-panel';
 import { SourcesPanel } from './orchestrator/sources-panel';
 import { ProgressPanel } from './orchestrator/progress-panel';
+import { AssistantStream } from './orchestrator/assistant-stream';
 
 export function Chat({
   id,
@@ -171,6 +172,7 @@ export function Chat({
             <PlannerPanel />
             <SourcesPanel />
             <ProgressPanel />
+            <AssistantStream />
           </>
         )}
 

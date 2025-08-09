@@ -25,7 +25,8 @@ export async function routerAgent(ctx: any) {
   });
 
   const pick = await res.toolCalls().then((calls: any[]) => calls.find((c) => c.toolName === 'choose')?.args);
-  return NextSchema.parse(pick ?? { next: 'finalize' });
+  // Prefer starting with a planning pass in case of uncertainty
+  return NextSchema.parse(pick ?? { next: 'plan' });
 }
 
 
