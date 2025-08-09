@@ -28,6 +28,9 @@ import { ArrowDown } from 'lucide-react';
 import { useScrollToBottom } from '@/hooks/use-scroll-to-bottom';
 import type { VisibilityType } from './visibility-selector';
 import type { Attachment, ChatMessage } from '@/lib/types';
+import { CreditLimitDisplay } from './upgrade-cta/credit-limit-display';
+import { LoginPrompt } from './upgrade-cta/login-prompt';
+import { featureFlags } from '@/lib/feature-flags';
 
 function PureMultimodalInput({
   chatId,
@@ -220,6 +223,9 @@ function PureMultimodalInput({
           />
         )}
 
+      {/* Guest credit banner (shows only if anonymous cookie exists) */}
+      {featureFlags.credits && <CreditLimitDisplay className="-mt-2" />}
+
       {/* Upload input removed - reserved for future audio feature */}
 
       {(attachments.length > 0 || uploadQueue.length > 0) && (
@@ -275,6 +281,7 @@ function PureMultimodalInput({
       />
 
       <div className="absolute bottom-0 p-2 w-fit flex flex-row justify-start">
+        {/* For now, show a login prompt on attempt to use attachments/tools in future */}
         <AudioPlaceholderButton status={status} />
       </div>
 

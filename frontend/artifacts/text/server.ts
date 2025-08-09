@@ -17,18 +17,13 @@ export const textDocumentHandler = createDocumentHandler<'text'>({
     });
 
     for await (const delta of fullStream) {
-      const { type } = delta;
-
-      if (type === 'text') {
-        const { text } = delta;
-
+      const { type } = delta as any;
+      // Support both AI SDK v4 ('text') and v5 ('text-delta') event names
+      if (type === 'text' || type === 'text-delta') {
+        const text = (delta as any).text;
+        if (!text) continue;
         draftContent += text;
-
-        dataStream.write({
-          type: 'data-textDelta',
-          data: text,
-          transient: true,
-        });
+        dataStream.write({ type: 'data-textDelta', data: text, transient: true });
       }
     }
 
@@ -53,18 +48,12 @@ export const textDocumentHandler = createDocumentHandler<'text'>({
     });
 
     for await (const delta of fullStream) {
-      const { type } = delta;
-
-      if (type === 'text') {
-        const { text } = delta;
-
+      const { type } = delta as any;
+      if (type === 'text' || type === 'text-delta') {
+        const text = (delta as any).text;
+        if (!text) continue;
         draftContent += text;
-
-        dataStream.write({
-          type: 'data-textDelta',
-          data: text,
-          transient: true,
-        });
+        dataStream.write({ type: 'data-textDelta', data: text, transient: true });
       }
     }
 

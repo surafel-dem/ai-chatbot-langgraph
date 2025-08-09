@@ -12,6 +12,7 @@ A modern, full-stack AI chatbot application built with **Next.js 15**, **Convex*
 ### 💬 **Chat System**
 - **Real-time Messaging** - Instant message delivery with Convex reactivity
 - **AI Integration** - Support for OpenAI, Anthropic, and other AI SDK providers
+- **Credits (feature-flagged)** - Guest daily credits and registered-user credit reservation/finalization
 - **Message History** - Persistent chat history for registered users
 - **Streaming Responses** - Real-time AI response streaming
 
@@ -34,7 +35,7 @@ A modern, full-stack AI chatbot application built with **Next.js 15**, **Convex*
 - **Statistics** - View voting statistics per chat
 
 ### 🧹 **Auto-cleanup**
-- **Guest Data** - Automatic cleanup of guest sessions after 24 hours
+- **Guest Data** - Automatic cleanup of guest sessions after 24 hours (guest credits reset daily via cookie TTL)
 - **File Expiration** - Temporary files removed automatically
 - **Database Health** - Automated maintenance to prevent bloat
 

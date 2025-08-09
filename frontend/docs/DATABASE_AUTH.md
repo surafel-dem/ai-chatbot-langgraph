@@ -47,6 +47,7 @@ See `frontend/convex/schema.ts` for full definitions and indices.
 
 - `users`
   - `clerk_id?`, `email?`, `name?`, `image_url?`, `is_guest`, `guest_id?`, usage counters, timestamps
+  - Credits (registered users): `credits?`, `reserved_credits?`
   - Indices: `by_clerk_id`, `by_email`, `by_guest_id`
 - `chats`
   - `id` (UUID), `user_id`, `title`, `visibility`, counters, timestamps
@@ -74,6 +75,21 @@ See `frontend/convex/schema.ts` for full definitions and indices.
 
 - Users (`frontend/convex/users.ts`)
   - `getCurrentUser` (query), `ensureUser` (mutation), `createGuestUser` (mutation), `getUserById` (query), `updateProfile`, `getUserStats`
+- Credits (`frontend/convex/credits.ts`)
+  - `getUserCreditsInfo` (query)
+  - `reserveAvailableCredits` (mutation)
+  - `finalizeCreditsUsage` (mutation)
+  - `releaseReservedCredits` (mutation)
+
+## Guest Credits & Cookies
+
+- Cookie key: `anonymous-session`
+- Shape (JSON): `{ id: string, remainingCredits: number, createdAt: ISO string }`
+- TTL: 24 hours (`ANONYMOUS_LIMITS.SESSION_DURATION`)
+- Client-visible: cookie is not HttpOnly so the UI banner and sidebar can display live remaining credits
+- Deduction policy (feature-flagged):
+  - Guest requests deduct a base model cost per send (chat-model=1, reasoning=2) and refund on error
+  - Block at 0 with CTA to sign in; a banner above the input communicates remaining credits
 - Chats (`frontend/convex/chats.ts`)
   - `createChat`, `getUserChats`, `getUserChatsById`, `getChatById`, `updateChatTitle`, `deleteChat`
   - `sendMessage`, `getChatMessagesById`, `startStream`, `completeStream`, `getActiveStreams`

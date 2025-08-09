@@ -1,0 +1,299 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+    --foreground-rgb: 0, 0, 0;
+    --background-start-rgb: 214, 219, 220;
+    --background-end-rgb: 255, 255, 255;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --foreground-rgb: 255, 255, 255;
+        --background-start-rgb: 0, 0, 0;
+        --background-end-rgb: 0, 0, 0;
+    }
+}
+
+@layer utilities {
+    .text-balance {
+        text-wrap: balance;
+    }
+}
+
+:root {
+    --background: 0 0% 97.0392%;
+    --foreground: 0 0% 20%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 20%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 20%;
+    --primary: 217.2193 91.2195% 59.8039%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220.0000 14.2857% 95.8824%;
+    --secondary-foreground: 215 13.7931% 34.1176%;
+    --muted: 210 20.0000% 98.0392%;
+    --muted-foreground: 220 8.9362% 46.0784%;
+    --accent: 204.0000 93.7500% 93.7255%;
+    --accent-foreground: 224.4444 64.2857% 32.9412%;
+    --destructive: 0 84.2365% 60.1961%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13.0435% 90.9804%;
+    --input: 220 13.0435% 90.9804%;
+    --ring: 217.2193 91.2195% 59.8039%;
+    --chart-1: 217.2193 91.2195% 59.8039%;
+    --chart-2: 221.2121 83.1933% 53.3333%;
+    --chart-3: 224.2781 76.3265% 48.0392%;
+    --chart-4: 225.9310 70.7317% 40.1961%;
+    --chart-5: 224.4444 64.2857% 32.9412%;
+    --sidebar: 210 20.0000% 98.0392%;
+    --sidebar-foreground: 0 0% 20%;
+    --sidebar-primary: 217.2193 91.2195% 59.8039%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 204.0000 93.7500% 93.7255%;
+    --sidebar-accent-foreground: 224.4444 64.2857% 32.9412%;
+    --sidebar-border: 220 13.0435% 90.9804%;
+    --sidebar-ring: 217.2193 91.2195% 59.8039%;
+    --font-sans: Inter, sans-serif;
+    --font-serif: Source Serif 4, serif;
+    --font-mono: JetBrains Mono, monospace;
+    --radius: 0.55rem;
+    --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+    --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+    --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
+    --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
+    --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 2px 4px -1px hsl(0 0% 0% / 0.10);
+    --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 4px 6px -1px hsl(0 0% 0% / 0.10);
+    --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 8px 10px -1px hsl(0 0% 0% / 0.10);
+    --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+    --tracking-normal: 0em;
+    --spacing: 0.25rem;
+  }
+  
+  .dark {
+    --background: 0 0% 9.0196%;
+    --foreground: 0 0% 89.8039%;
+    --card: 0 0% 14.9020%;
+    --card-foreground: 0 0% 89.8039%;
+    --popover: 0 0% 14.9020%;
+    --popover-foreground: 0 0% 89.8039%;
+    --primary: 217.2193 91.2195% 59.8039%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 14.9020%;
+    --secondary-foreground: 0 0% 89.8039%;
+    --muted: 0 0% 14.9020%;
+    --muted-foreground: 0 0% 63.9216%;
+    --accent: 224.4444 64.2857% 32.9412%;
+    --accent-foreground: 213.3333 96.9231% 87.2549%;
+    --destructive: 0 84.2365% 60.1961%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 25.0980%;
+    --input: 0 0% 25.0980%;
+    --ring: 217.2193 91.2195% 59.8039%;
+    --chart-1: 213.1169 93.9024% 67.8431%;
+    --chart-2: 217.2193 91.2195% 59.8039%;
+    --chart-3: 221.2121 83.1933% 53.3333%;
+    --chart-4: 224.2781 76.3265% 48.0392%;
+    --chart-5: 225.9310 70.7317% 40.1961%;
+    --sidebar: 0 0% 14.9020%;
+    --sidebar-foreground: 0 0% 89.8039%;
+    --sidebar-primary: 217.2193 91.2195% 59.8039%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 224.4444 64.2857% 32.9412%;
+    --sidebar-accent-foreground: 213.3333 96.9231% 87.2549%;
+    --sidebar-border: 0 0% 25.0980%;
+    --sidebar-ring: 217.2193 91.2195% 59.8039%;
+    --font-sans: Inter, sans-serif;
+    --font-serif: Source Serif 4, serif;
+    --font-mono: JetBrains Mono, monospace;
+    --radius: 0.55rem;
+    --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+    --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+    --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
+    --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
+    --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 2px 4px -1px hsl(0 0% 0% / 0.10);
+    --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 4px 6px -1px hsl(0 0% 0% / 0.10);
+    --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 8px 10px -1px hsl(0 0% 0% / 0.10);
+    --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+  }
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+
+    body {
+        @apply bg-background text-foreground;
+    }
+}
+
+.skeleton {
+    * {
+        pointer-events: none !important;
+    }
+
+    *[class^="text-"] {
+        color: transparent;
+        @apply rounded-md bg-foreground/20 select-none animate-pulse;
+    }
+
+    .skeleton-bg {
+        @apply bg-foreground/10;
+    }
+
+    .skeleton-div {
+        @apply bg-foreground/20 animate-pulse;
+    }
+}
+
+.lexical-editor {
+    outline: none;
+}
+
+.cm-editor,
+.cm-gutters {
+    @apply bg-background dark:bg-zinc-800 outline-none selection:bg-zinc-900 !important;
+}
+
+.ͼo.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground,
+.ͼo.cm-selectionBackground,
+.ͼo.cm-content::selection {
+    @apply bg-zinc-200 dark:bg-zinc-900 !important;
+}
+
+.cm-activeLine,
+.cm-activeLineGutter {
+    @apply bg-transparent !important;
+}
+
+.cm-activeLine {
+    @apply rounded-r-sm !important;
+}
+
+.cm-lineNumbers {
+    @apply min-w-7;
+}
+
+.cm-foldGutter {
+    @apply min-w-3;
+}
+
+.cm-lineNumbers .cm-activeLineGutter {
+    @apply rounded-l-sm !important;
+}
+
+.suggestion-highlight {
+    @apply bg-blue-200 hover:bg-blue-300 dark:hover:bg-blue-400/50 dark:text-blue-50 dark:bg-blue-500/40;
+}
+
+/* Lexical Editor Styles */
+.lexical-editor-container {
+    position: relative;
+    width: 100%;
+}
+
+.lexical-content-editable {
+    position: relative;
+    outline: none;
+    user-select: text;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: 1.5;
+    color: inherit;
+    background: transparent;
+    border: none;
+    resize: none;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+.lexical-content-editable::-webkit-scrollbar {
+    width: 4px;
+}
+
+.lexical-content-editable::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.lexical-content-editable::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 2px;
+}
+
+.lexical-content-editable::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+}
+
+.lexical-placeholder {
+    color: hsl(var(--muted-foreground));
+    pointer-events: none;
+    user-select: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+}
+
+.lexical-root {
+    position: relative;
+}
+
+.lexical-root p {
+    margin: 0;
+    padding: 0;
+}
+
+.lexical-root p:first-child {
+    margin-top: 0;
+}
+
+.lexical-root p:last-child {
+    margin-bottom: 0;
+}
+
+/* Focus styles */
+.lexical-content-editable:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+/* Ensure proper text selection */
+.lexical-content-editable::selection {
+    background: hsl(var(--primary) / 0.3);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .lexical-content-editable {
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+}
+
+.editor-container {
+    background: #fff;
+    margin: 20px auto 20px auto;
+    border-radius: 2px;
+    max-width: 600px;
+    color: #000;
+    position: relative;
+    line-height: 20px;
+    font-weight: 400;
+    text-align: left;
+    border-radius: 10px;
+  }
+  
+  .editor-input {
+    resize: none;
+    font-size: 15px;
+    position: relative;
+    tab-size: 1;
+    outline: 0;
+    padding: 10px 10px 5px;
+    caret-color: currentColor;
+  }
+  

@@ -44,6 +44,13 @@ function PureArtifactMessages({
       ref={messagesContainerRef}
       className="flex flex-col gap-4 h-full items-center overflow-y-scroll px-4 pt-20"
     >
+      {messages.length === 0 && (
+        <div className="w-full max-w-md mt-10 text-center text-sm text-muted-foreground">
+          <div className="mx-auto w-16 h-16 rounded-full bg-muted mb-4" />
+          <div className="font-medium mb-1">No messages yet</div>
+          <div>Ask something to get started, or open an artifact to view generated content.</div>
+        </div>
+      )}
       {messages.map((message, index) => (
         <PreviewMessage
           chatId={chatId}

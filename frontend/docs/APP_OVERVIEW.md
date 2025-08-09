@@ -88,6 +88,9 @@ tests/                  # Playwright E2E and route tests
   - Creates the chat if missing (with title via `generateTitleFromUserMessage`)
   - Saves the user message, starts a stream record, streams AI output using AI SDK
   - Tools available for non-reasoning model: `getWeather`, `createDocument`, `updateDocument`, `requestSuggestions`
+  - Credits (feature-flagged):
+    - Guests: a readable `anonymous-session` cookie tracks `remainingCredits` (default 10/day in prod). Each send deducts a base model cost (chat-model=1, reasoning=2). At 0, requests are blocked with a CTA to sign in. Cookie resets daily.
+    - Registered users: Convex credits are reserved before streaming and finalized after streaming, using base model cost + per-tool fixed costs. Reservation is released on error/timeout.
   - On finish, saves generated assistant messages and completes stream
   - DELETE supports chat deletion with ownership checks
 
@@ -128,6 +131,12 @@ tests/                  # Playwright E2E and route tests
   - `create-document.ts`: emits transient UI data and persists a new document via `documentHandlersByArtifactKind`
   - `update-document.ts`: fetches document from Convex and applies handler-driven updates
   - `request-suggestions.ts`: streams structured edits and persists suggestions
+
+#### Tool Costs (Credits)
+
+- Defined in `lib/ai/tool-costs.ts`:
+  - Base model cost: chat-model=1, chat-model-reasoning=2
+  - Tool costs: `getWeather:1`, `createDocument:5`, `updateDocument:5`, `requestSuggestions:1`
 
 ### Artifacts and Document Handlers
 
