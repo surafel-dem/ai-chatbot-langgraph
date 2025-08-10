@@ -4,22 +4,14 @@ import { routerAgent } from './router';
 import { plannerAgent } from './planner';
 import { MAX_STEPS } from './budget';
 import { purchaseAdviceAgent } from '../agents/purchase';
+import { runningCostAgent } from '../agents/running';
+import { reliabilityAgent } from '../agents/reliability';
 
 const specialists: Record<string, any> = {
   plan: plannerAgent,
   purchase_advice: purchaseAdviceAgent,
-  running_cost: async (ctx: any) => ({
-    textStream: (async function* () {
-      yield 'Running cost specialist is not implemented yet. Passing back to router...\n';
-    })(),
-    toolEvents: (async function* () {})(),
-  }),
-  reliability: async (ctx: any) => ({
-    textStream: (async function* () {
-      yield 'Reliability specialist is not implemented yet. Passing back to router...\n';
-    })(),
-    toolEvents: (async function* () {})(),
-  }),
+  running_cost: runningCostAgent,
+  reliability: reliabilityAgent,
   synthesis: async () => ({
     textStream: (async function* () {
       yield 'Synthesis step (optional).\n';
