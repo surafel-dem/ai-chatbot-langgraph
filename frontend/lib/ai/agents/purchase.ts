@@ -40,18 +40,33 @@ export async function purchaseAdviceAgent(ctx: RunContext) {
     plan = { year: yearMatch ? Number(yearMatch[0]) : undefined, focus: ['value'] } as any;
   }
 
-  // 2) Run tools (spec + price + web) sequentially now; can parallelize later
-  ui.toolStart('specLookup', plan);
-  const spec = await specLookup.execute({ make: plan.make ?? '', model: plan.model ?? '', year: plan.year });
-  ui.toolResult('specLookup', spec);
+  // 2) Run tools (spec + price + web) with guards
+  let spec: any = {};
+  try {
+    ui.toolStart('specLookup', plan);
+    spec = await specLookup.execute({ make: plan.make ?? '', model: plan.model ?? '', year: plan.year });
+    ui.toolResult('specLookup', spec);
+  } catch (e) {
+    ui.toolResult('specLookup', { error: String((e as any)?.message || e) });
+  }
 
-  ui.toolStart('priceLookup', plan);
-  const prices = await priceLookup.execute({ make: plan.make ?? '', model: plan.model ?? '', year: plan.year });
-  ui.toolResult('priceLookup', prices);
+  let prices: any = {};
+  try {
+    ui.toolStart('priceLookup', plan);
+    prices = await priceLookup.execute({ make: plan.make ?? '', model: plan.model ?? '', year: plan.year });
+    ui.toolResult('priceLookup', prices);
+  } catch (e) {
+    ui.toolResult('priceLookup', { error: String((e as any)?.message || e) });
+  }
 
-  ui.toolStart('webSearch', { q: `${plan.make ?? ''} ${plan.model ?? ''} ${plan.year ?? ''} review Ireland`, k: 3 });
-  const search = await webSearch.execute({ q: `${plan.make ?? ''} ${plan.model ?? ''} ${plan.year ?? ''} review Ireland`, k: 3 });
-  ui.toolResult('webSearch', search);
+  let search: any = { results: [] };
+  try {
+    ui.toolStart('webSearch', { q: `${plan.make ?? ''} ${plan.model ?? ''} ${plan.year ?? ''} review Ireland`, k: 3 });
+    search = await webSearch.execute({ q: `${plan.make ?? ''} ${plan.model ?? ''} ${plan.year ?? ''} review Ireland`, k: 3 });
+    ui.toolResult('webSearch', search);
+  } catch (e) {
+    ui.toolResult('webSearch', { error: String((e as any)?.message || e) });
+  }
 
   // Emit sources from web results
   const sources = (search.results ?? []).map((r: any) => ({ url: r.url, title: r.title, snippet: r.snippet }));

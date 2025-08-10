@@ -27,12 +27,16 @@ export async function routerAgent(ctx: any) {
     if (lastText.includes('[orchestrator]') && userCount === 1) {
       const detectedInit = ((): any => {
         const t = lastText.toLowerCase();
-        if (/running cost|running costs|cost analysis|mpg|insurance|tax/.test(t)) return 'running_cost' as const;
-        if (/reliability|common issues|recalls?/.test(t)) return 'reliability' as const;
-        if (/purchase advice|buy|compare|vs\b/.test(t)) return 'purchase_advice' as const;
+        if (/running cost/.test(t)) return 'running_cost' as const;
+        if (/reliability/.test(t)) return 'reliability' as const;
+        if (/purchase advice/.test(t)) return 'purchase_advice' as const;
         return null;
       })();
       if (detectedInit) return { next: detectedInit, reason: 'specialist_from_first' };
+      // If message is "Plan"/"Plan first" or similar, choose plan explicitly
+      if (/^\s*plan( first)?\s*$/i.test(lastText) || /plan car analysis/i.test(lastText)) {
+        return { next: 'plan' as const, reason: 'user_requested_plan' };
+      }
       return { next: 'plan' as const, reason: 'forced_by_ui' };
     }
 
