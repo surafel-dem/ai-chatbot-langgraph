@@ -33,7 +33,8 @@ export function DataStreamHandler() {
       if (delta.type === 'data-part' && typeof delta.data === 'object' && delta.data) {
         const kind = (delta.data as any).type;
         if (kind === 'planner-state') {
-          setPlanner((delta.data as any).selectedCar ?? (delta.data as any));
+          const ps = (delta.data as any).selectedCar ?? (delta.data as any);
+          setPlanner(ps);
         }
         if (kind === 'source-url') {
           const url = (delta.data as any).url;

@@ -2,8 +2,8 @@ import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 
 export const startRun = mutation({
-  args: { chat_id: v.string(), user_id: v.string() },
-  handler: async (ctx, { chat_id, user_id }) => {
+  args: { chat_id: v.string(), user_id: v.string(), planner_state: v.optional(v.any()) },
+  handler: async (ctx, { chat_id, user_id, planner_state }) => {
     const runId = await ctx.db.insert("runs", {
       chat_id,
       user_id,
@@ -12,6 +12,7 @@ export const startRun = mutation({
       token_in: 0,
       token_out: 0,
       started_at: Date.now(),
+      planner_state,
     });
     return runId;
   },

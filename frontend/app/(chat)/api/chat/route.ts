@@ -181,6 +181,8 @@ export const POST = withOptionalAuth(async ({ convex, userId, request }) => {
         const runId = await convex.mutation(api.runs.startRun, {
           chat_id: id,
           user_id: userId ?? guestId ?? '',
+          // persist last known planner-state if already computed (optional enhancement)
+          planner_state: undefined,
         });
 
         try {

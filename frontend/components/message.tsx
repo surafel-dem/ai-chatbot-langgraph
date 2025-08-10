@@ -150,7 +150,7 @@ const PurePreviewMessage = ({
                             message.role === 'user',
                         })}
                       >
-                        <Markdown>{sanitizeText(part.text)}</Markdown>
+                       <Markdown>{sanitizeText(part.text).replace(/^\[orchestrator\]\s*/i, '')}</Markdown>
                       </div>
                     </div>
                   );

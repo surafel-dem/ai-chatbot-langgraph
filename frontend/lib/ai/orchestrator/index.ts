@@ -38,6 +38,7 @@ export async function runOrchestrator(ctx: any) {
   const stepId = await startStep(ctx.convex, { runId: ctx.runId, role, name });
 
   try {
+    // Pass planner-state through ctx.selectedCar when available
     const impl = specialists[route.next];
     const result = await impl(ctx);
 
