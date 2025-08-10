@@ -136,8 +136,7 @@ export function Chat({
   const isArtifactVisible = useArtifactSelector((state) => state.isVisible);
 
   // Read minimal orchestrator state (for optional small inline indicators)
-  const plannerState = useOrchestratorStore((s) => s.plannerState);
-  const finishedSteps = useOrchestratorStore((s) => s.finishedSteps);
+  // Orchestrator state kept internal; UI shows only answer + sources for now
   const resetOrchestrator = useOrchestratorStore((s) => s.reset);
 
   useAutoResume({

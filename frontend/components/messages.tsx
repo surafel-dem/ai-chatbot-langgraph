@@ -9,9 +9,7 @@ import { useMessages } from '@/hooks/use-messages';
 import type { ChatMessage } from '@/lib/types';
 import { useDataStream } from './data-stream-provider';
 import { featureFlags } from '@/lib/feature-flags';
-import { PlannerPanel } from './orchestrator/planner-panel';
 import { SourcesPanel } from './orchestrator/sources-panel';
-import { ProgressPanel } from './orchestrator/progress-panel';
 import { AssistantStream } from './orchestrator/assistant-stream';
 
 interface MessagesProps {
@@ -80,12 +78,8 @@ function PureMessages({
 
       {featureFlags.agentsOrchestrator && (
         <>
-          <PlannerPanel />
-          {/* Sources list and Answer stream */}
           <AssistantStream />
           <SourcesPanel />
-          {/* Debug statuses are hidden by default; still show step count chip */}
-          <ProgressPanel />
         </>
       )}
 
