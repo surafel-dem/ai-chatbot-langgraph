@@ -271,6 +271,12 @@ function PureMultimodalInput({
           ) {
             event.preventDefault();
 
+            // In orchestrator mode, allow immediate follow-ups to the specialist
+            if (featureFlags.agentsOrchestrator) {
+              submitForm();
+              return;
+            }
+
             if (status !== 'ready') {
               toast.error('Please wait for the model to finish its response!');
             } else {
@@ -286,7 +292,7 @@ function PureMultimodalInput({
       </div>
 
       <div className="absolute bottom-0 right-0 p-2 w-fit flex flex-row justify-end">
-        {status === 'submitted' ? (
+        {status === 'submitted' && !featureFlags.agentsOrchestrator ? (
           <StopButton stop={stop} setMessages={setMessages} />
         ) : (
           <SendButton

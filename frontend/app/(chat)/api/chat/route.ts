@@ -202,7 +202,7 @@ export const POST = withOptionalAuth(async ({ convex, userId, request }) => {
           });
         } finally {
           await convex.mutation(api.runs.endRun, { run_id: runId });
-          dataStream.done();
+          // Orchestrator will explicitly call ui.done() at the end of each step; avoid double-close here
         }
       } else {
         // Existing chat-only path (kept intact)

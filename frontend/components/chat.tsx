@@ -146,13 +146,7 @@ export function Chat({
     setMessages,
   });
 
-  // Clear UI data stream and orchestrator state at the start of a new send
-  useEffect(() => {
-    if (status === 'submitted') {
-      setDataStream([]);
-      resetOrchestrator();
-    }
-  }, [status, setDataStream, resetOrchestrator]);
+  // Do NOT clear the UI data stream on submit; let the previous run's text persist
 
   // Clear on new conversation mount or when navigating back to an empty chat
   useEffect(() => {

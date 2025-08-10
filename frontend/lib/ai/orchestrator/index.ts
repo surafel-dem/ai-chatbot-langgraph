@@ -58,11 +58,6 @@ export async function runOrchestrator(ctx: any) {
 
     out.finishStep();
     await endStep(ctx.convex, { stepId });
-
-    // Ensure UI stream closes promptly when a specialist only asks a clarification
-    if (typeof (ctx.ui as any)?.done === 'function') {
-      try { (ctx.ui as any).done(); } catch {}
-    }
   } catch (e: any) {
     out.textDelta(`Error in step ${name}: ${String(e?.message || e)}\n`);
     await endStep(ctx.convex, { stepId, error: String(e?.message || e) });
