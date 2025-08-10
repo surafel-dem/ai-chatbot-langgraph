@@ -20,6 +20,23 @@ export async function reliabilityAgent(ctx: RunContext) {
   const sources = (search.results ?? []).map((r: any) => ({ url: r.url, title: r.title, snippet: r.snippet }));
   for (const s of sources) ui.sourceUrl(s.url, s.title);
 
+  // Ask for details if missing
+  const lastUser = [...(ctx.messages as any[])].reverse().find((m: any) => m.role === 'user');
+  const text = typeof lastUser?.content === 'string'
+    ? (lastUser?.content as string)
+    : Array.isArray((lastUser as any)?.parts)
+      ? (lastUser as any).parts.filter((p: any) => p?.type === 'text').map((p: any) => p.text).join(' ')
+      : '';
+  if (!/\b[a-z]{2,}\b/i.test(text)) {
+    async function* ask() {
+      const msg = 'Which car should I check reliability for? Please include make, model, and year.';
+      ui.textDelta(msg);
+      return;
+    }
+    async function* empty() { return; }
+    return { textStream: ask(), toolEvents: empty(), sources } as const;
+  }
+
   const result: any = await streamText({
     model: getModel(ctx.selectedChatModel),
     messages: [

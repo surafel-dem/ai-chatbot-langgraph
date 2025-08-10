@@ -22,6 +22,16 @@ export async function runningCostAgent(ctx: RunContext) {
   const year = yearMatch ? Number(yearMatch[0]) : undefined;
   // We leave make/model empty if not obvious; tools can still return structure
 
+  if (!text || (!year && !/\b[a-z]{2,}\b/i.test(text))) {
+    async function* ask() {
+      const msg = 'Sure, please provide the make and model (and year) of the target car so I can estimate running costs.';
+      ui.textDelta(msg);
+      return;
+    }
+    async function* empty() { return; }
+    return { textStream: ask(), toolEvents: empty(), sources: [] } as const;
+  }
+
   // Run tools lightly up-front for grounding
   ui.toolStart('specLookup', { context: 'running_cost', text });
   const spec = await specLookup.execute({ make: '', model: '', year }).catch(() => ({}));

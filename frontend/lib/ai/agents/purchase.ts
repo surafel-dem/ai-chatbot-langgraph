@@ -40,6 +40,17 @@ export async function purchaseAdviceAgent(ctx: RunContext) {
     plan = { year: yearMatch ? Number(yearMatch[0]) : undefined, focus: ['value'] } as any;
   }
 
+  // If not enough details, ask a concise clarification and end quickly
+  if (!plan.make || !plan.model) {
+    async function* quickAsk() {
+      const text = 'Please specify the target car (make, model, year) so I can advise on trims, pricing, and value.';
+      ui.textDelta(text);
+      return;
+    }
+    async function* empty() { return; }
+    return { textStream: quickAsk(), toolEvents: empty(), sources: [] } as const;
+  }
+
   // 2) Run tools (spec + price + web) with guards
   let spec: any = {};
   try {
