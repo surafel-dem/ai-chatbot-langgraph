@@ -23,8 +23,16 @@ export async function routerAgent(ctx: any) {
     const firstText = extract(first);
     const userCount = users.length;
 
-    // First send with [orchestrator] → plan. Subsequent sends should move to a specialist.
+    // First send with [orchestrator]: if it clearly names an intent, go straight to that specialist; else plan
     if (lastText.includes('[orchestrator]') && userCount === 1) {
+      const detectedInit = ((): any => {
+        const t = lastText.toLowerCase();
+        if (/running cost|running costs|cost analysis|mpg|insurance|tax/.test(t)) return 'running_cost' as const;
+        if (/reliability|common issues|recalls?/.test(t)) return 'reliability' as const;
+        if (/purchase advice|buy|compare|vs\b/.test(t)) return 'purchase_advice' as const;
+        return null;
+      })();
+      if (detectedInit) return { next: detectedInit, reason: 'specialist_from_first' };
       return { next: 'plan' as const, reason: 'forced_by_ui' };
     }
 

@@ -22,24 +22,24 @@ function PureSuggestedActions({
   const suggestedActions = featureFlags.agentsOrchestrator
     ? [
         {
-          title: 'Help me choose a car',
-          label: 'e.g., 2018 Toyota Corolla in Ireland',
-          action: 'Help me choose a 2018 Toyota Corolla to buy in Ireland',
+          title: 'Purchase advice',
+          label: 'value, trims, price bands',
+          action: 'Purchase advice for 2020 Toyota Corolla in Ireland',
         },
         {
-          title: 'Estimate running costs',
-          label: 'for [make model year]',
-          action: 'Estimate running costs for 2018 Toyota Corolla in Ireland',
+          title: 'Running costs',
+          label: 'fuel, tax, insurance, service',
+          action: 'Running cost analysis for 2019 Honda Civic 1.0 turbo in Ireland',
         },
         {
-          title: 'Check reliability',
-          label: 'common issues and recalls',
-          action: 'Check reliability and common issues for Toyota Corolla 2018',
+          title: 'Reliability',
+          label: 'common issues, recalls, what to inspect',
+          action: 'Check reliability and common issues for 2018 Toyota Corolla',
         },
         {
-          title: 'Compare two cars',
-          label: '[car A] vs [car B] in Ireland',
-          action: 'Compare 2018 Toyota Corolla vs 2018 Honda Civic in Ireland',
+          title: 'Plan first',
+          label: 'normalize make/model/year',
+          action: 'Plan car analysis for a 2018 Corolla Hybrid vs 2018 Civic',
         },
       ]
     : [
