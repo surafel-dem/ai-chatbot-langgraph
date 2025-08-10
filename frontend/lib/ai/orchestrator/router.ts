@@ -11,8 +11,24 @@ export async function routerAgent(ctx: any) {
   // If the last user message contains an orchestrator tag, prefer planning
   try {
     const last = ctx.messages?.slice()?.reverse()?.find((m: any) => m.role === 'user');
-    if (last && typeof last.content === 'string' && last.content.includes('[orchestrator]')) {
+    const text = typeof last?.content === 'string'
+      ? (last?.content as string)
+      : Array.isArray((last as any)?.parts)
+        ? (last as any).parts.filter((p: any) => p?.type === 'text').map((p: any) => p.text).join(' ')
+        : '';
+    if (text.includes('[orchestrator]')) {
       return { next: 'plan' as const, reason: 'forced_by_ui' };
+    }
+    // Lightweight heuristics to bias routing based on explicit user intent
+    const t = text.toLowerCase();
+    if (t.includes('running cost') || t.includes('running costs') || t.includes('cost analysis')) {
+      return { next: 'running_cost' as const, reason: 'heuristic_running_cost' };
+    }
+    if (t.includes('reliability') || t.includes('common issues') || t.includes('recall')) {
+      return { next: 'reliability' as const, reason: 'heuristic_reliability' };
+    }
+    if (t.includes('purchase advice') || t.includes('should i buy') || t.includes('compare')) {
+      return { next: 'purchase_advice' as const, reason: 'heuristic_purchase' };
     }
   } catch {}
 

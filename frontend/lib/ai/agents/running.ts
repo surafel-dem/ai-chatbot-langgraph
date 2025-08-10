@@ -10,13 +10,25 @@ import { specLookup } from '../tools/specLookup';
 export async function runningCostAgent(ctx: RunContext) {
   const ui = emit(ctx.ui);
 
+  // Try to extract target car from the latest messages if present
+  const lastUser = [...ctx.messages].reverse().find((m: any) => m.role === 'user');
+  const text = typeof lastUser?.content === 'string'
+    ? (lastUser?.content as string)
+    : Array.isArray((lastUser as any)?.parts)
+      ? (lastUser as any).parts.filter((p: any) => p?.type === 'text').map((p: any) => p.text).join(' ')
+      : '';
+  // Very loose regex extraction (best-effort)
+  const yearMatch = text.match(/\b(19|20)\d{2}\b/);
+  const year = yearMatch ? Number(yearMatch[0]) : undefined;
+  // We leave make/model empty if not obvious; tools can still return structure
+
   // Run tools lightly up-front for grounding
-  ui.toolStart('specLookup', { context: 'running_cost' });
-  const spec = await specLookup.execute({ make: '', model: '', year: undefined }).catch(() => ({}));
+  ui.toolStart('specLookup', { context: 'running_cost', text });
+  const spec = await specLookup.execute({ make: '', model: '', year }).catch(() => ({}));
   ui.toolResult('specLookup', spec);
 
-  ui.toolStart('priceLookup', { context: 'running_cost' });
-  const prices = await priceLookup.execute({ make: '', model: '', year: undefined }).catch(() => ({}));
+  ui.toolStart('priceLookup', { context: 'running_cost', text });
+  const prices = await priceLookup.execute({ make: '', model: '', year }).catch(() => ({}));
   ui.toolResult('priceLookup', prices);
 
   ui.toolStart('webSearch', { q: 'running cost ownership fuel tax insurance Ireland', k: 2 });

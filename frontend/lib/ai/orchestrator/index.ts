@@ -32,10 +32,7 @@ export async function runOrchestrator(ctx: any) {
   while (stepNum++ < MAX_STEPS && !ctx.signal.aborted) {
     let route = await routerAgent(ctx);
 
-    // Prevent infinite plan loops: if planner already ran and router still says plan, force purchase_advice
-    if (route.next === 'plan' && plannedOnce) {
-      route = { next: 'purchase_advice', reason: 'forced_after_plan' } as any;
-    }
+    // Do not force a particular specialist; trust the router after planning.
 
     out.status(`Router selected: ${route.next}`);
     if (route.next === 'finalize') break;
@@ -66,7 +63,7 @@ export async function runOrchestrator(ctx: any) {
       await endStep(ctx.convex, { stepId });
 
       if (name === 'plan') plannedOnce = true;
-      if (name === 'purchase_advice') executedSpecialist = true;
+      if (name !== 'plan') executedSpecialist = true;
       if (executedSpecialist) break; // end after first specialist for now
     } catch (e: any) {
       out.textDelta(`Error in step ${name}: ${String(e?.message || e)}\n`);
