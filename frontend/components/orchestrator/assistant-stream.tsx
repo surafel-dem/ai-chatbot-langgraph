@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { useDataStream } from '@/components/data-stream-provider';
 import { featureFlags } from '@/lib/feature-flags';
+import { Markdown } from '@/components/markdown';
 
 export function AssistantStream() {
   const { dataStream } = useDataStream();
@@ -19,8 +20,8 @@ export function AssistantStream() {
 
   return (
     <div className="mx-auto w-full md:max-w-3xl px-4 pb-6">
-      <div className="rounded-lg bg-muted/30 border px-4 py-3 whitespace-pre-wrap leading-6">
-        {text}
+      <div className="prose dark:prose-invert max-w-none">
+        <Markdown>{text}</Markdown>
       </div>
     </div>
   );

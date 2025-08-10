@@ -8,6 +8,11 @@ import { motion } from 'framer-motion';
 import { useMessages } from '@/hooks/use-messages';
 import type { ChatMessage } from '@/lib/types';
 import { useDataStream } from './data-stream-provider';
+import { featureFlags } from '@/lib/feature-flags';
+import { PlannerPanel } from './orchestrator/planner-panel';
+import { SourcesPanel } from './orchestrator/sources-panel';
+import { ProgressPanel } from './orchestrator/progress-panel';
+import { AssistantStream } from './orchestrator/assistant-stream';
 
 interface MessagesProps {
   chatId: string;
@@ -72,6 +77,15 @@ function PureMessages({
       {status === 'submitted' &&
         messages.length > 0 &&
         messages[messages.length - 1].role === 'user' && <ThinkingMessage />}
+
+      {featureFlags.agentsOrchestrator && (
+        <>
+          <PlannerPanel />
+          <SourcesPanel />
+          <ProgressPanel />
+          <AssistantStream />
+        </>
+      )}
 
       <motion.div
         ref={messagesEndRef}

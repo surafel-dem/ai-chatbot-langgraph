@@ -15,6 +15,7 @@ export function DataStreamHandler() {
   const setPlanner = useOrchestratorStore((s) => s.setPlannerState);
   const addSource = useOrchestratorStore((s) => s.addSource);
   const markStepFinished = useOrchestratorStore((s) => s.markStepFinished);
+  const addStatus = useOrchestratorStore((s) => s.addStatus);
 
   useEffect(() => {
     if (!dataStream?.length) return;
@@ -37,6 +38,9 @@ export function DataStreamHandler() {
         }
         if (kind === 'finish-step') {
           markStepFinished();
+        }
+        if (kind === 'status') {
+          addStatus({ text: (delta.data as any).text, level: (delta.data as any).level });
         }
       }
       // Suppress artifact-driven modal opening during orchestrator mode
