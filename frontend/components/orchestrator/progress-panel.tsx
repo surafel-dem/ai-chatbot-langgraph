@@ -1,6 +1,7 @@
 'use client';
 
 import { useOrchestratorStore } from '@/stores/orchestrator-store';
+import { featureFlags } from '@/lib/feature-flags';
 
 export function ProgressPanel() {
   const finishedSteps = useOrchestratorStore((s) => s.finishedSteps);

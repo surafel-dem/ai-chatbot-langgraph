@@ -46,6 +46,7 @@ export async function plannerAgent(ctx: any) {
     }
     // Emit the computed planner-state at the end
     ui.plannerState(plan);
+    // If the user previously sent an orchestrator-tagged message and this is a follow-up, do not keep planning again
   }
 
   async function* toolEvents() {

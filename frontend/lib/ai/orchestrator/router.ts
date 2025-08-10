@@ -10,25 +10,40 @@ const NextSchema = z.object({
 export async function routerAgent(ctx: any) {
   // If the last user message contains an orchestrator tag, prefer planning
   try {
-    const last = ctx.messages?.slice()?.reverse()?.find((m: any) => m.role === 'user');
-    const text = typeof last?.content === 'string'
-      ? (last?.content as string)
-      : Array.isArray((last as any)?.parts)
-        ? (last as any).parts.filter((p: any) => p?.type === 'text').map((p: any) => p.text).join(' ')
-        : '';
-    if (text.includes('[orchestrator]')) {
+    const users = (ctx.messages ?? []).filter((m: any) => m.role === 'user');
+    const extract = (m: any) =>
+      typeof m?.content === 'string'
+        ? (m.content as string)
+        : Array.isArray(m?.parts)
+          ? m.parts.filter((p: any) => p?.type === 'text').map((p: any) => p.text).join(' ')
+          : '';
+    const last = users.at(-1);
+    const first = users.at(0);
+    const lastText = extract(last);
+    const firstText = extract(first);
+    const userCount = users.length;
+
+    // First send with [orchestrator] → plan. Subsequent sends should move to a specialist.
+    if (lastText.includes('[orchestrator]') && userCount === 1) {
       return { next: 'plan' as const, reason: 'forced_by_ui' };
     }
-    // Lightweight heuristics to bias routing based on explicit user intent
-    const t = text.toLowerCase();
-    if (t.includes('running cost') || t.includes('running costs') || t.includes('cost analysis')) {
-      return { next: 'running_cost' as const, reason: 'heuristic_running_cost' };
+
+    const allText = (users.map(extract).join(' ') || '').toLowerCase();
+    const intentFromAll = (txt: string) => {
+      if (/running cost|running costs|cost analysis|mpg|insurance|tax/.test(txt)) return 'running_cost' as const;
+      if (/reliability|common issues|recalls?/.test(txt)) return 'reliability' as const;
+      if (/purchase advice|should i buy|compare|vs\b/.test(txt)) return 'purchase_advice' as const;
+      return null;
+    };
+
+    const detectedAll = intentFromAll(allText);
+    if (userCount > 1 && detectedAll) {
+      return { next: detectedAll, reason: 'heuristic_from_history' };
     }
-    if (t.includes('reliability') || t.includes('common issues') || t.includes('recall')) {
-      return { next: 'reliability' as const, reason: 'heuristic_reliability' };
-    }
-    if (t.includes('purchase advice') || t.includes('should i buy') || t.includes('compare')) {
-      return { next: 'purchase_advice' as const, reason: 'heuristic_purchase' };
+    // Short follow-ups like "sedan" after planning → pick from first user intent or default to purchase
+    if (userCount > 1 && lastText.length <= 40) {
+      const detectedFirst = intentFromAll((firstText || '').toLowerCase());
+      return { next: detectedFirst ?? ('purchase_advice' as const), reason: 'followup_after_plan' };
     }
   } catch {}
 
