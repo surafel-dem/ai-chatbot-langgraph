@@ -32,7 +32,7 @@ This document records the state of the application before introducing the orches
 - Convex telemetry (`runs`, `steps`, `tool_calls`, `sources`) and mutations
 - Minimal UI scaffolding that preserves current layout
 - Tools with Zod schemas and safe fallbacks: `webSearch`, `priceLookup`, `specLookup`
-- One implemented specialist (Purchase Advice); others stubbed
+- Three specialists (Purchase Advice, Running Cost, Reliability). Each asks for missing car details once then exits so the composer is free. No hardcoded defaults.
 
 ## 4) Four phases — delivered changes
 
@@ -50,44 +50,45 @@ This document records the state of the application before introducing the orches
 
 ### Phase 4 — UI wiring (non‑disruptive)
 - Data stream wiring: `data-textDelta` and `data-part` events handled
-- Components: `components/orchestrator/{assistant-stream,planner-panel,sources-panel,progress-panel}.tsx`
-- Store: `stores/orchestrator-store.ts` (planner state, sources, progress)
-- Landing micro‑tweaks (flagged): agent‑focused suggestions, greeting subtitle, `PlannerHint`
-- No changes to styles/layout of sidebar history, greeting layout, suggestions grid structure, composer, or artifact overlay
+- Components: `components/orchestrator/{assistant-stream,sources-panel}.tsx` (progress/planner badges hidden by default)
+- Store: `stores/orchestrator-store.ts` (planner state, sources, citations)
+- Landing micro‑tweaks: specialist‑linked quick prompts (no hardcoded car text), greeting subtitle, `PlannerHint` hides once a specialist is active
+- Artifact overlay suppressed during orchestrator runs to avoid empty panel space
 
 ## 5) Specialists
 
-- Purchase Advice (implemented)
-  - Executes `specLookup`, `priceLookup`, `webSearch`; streams concise paragraphs with short headings
+- Purchase Advice
+  - Executes `specLookup`, `priceLookup`, `webSearch`; streams concise sections; robust fallback parsing of user input
   - Emits `source-url` items for citations
-- Running Cost & Reliability (stubs)
-  - Stream a short placeholder and yield control back to the router (no hangs)
+- Running Cost & Reliability
+  - Implemented; greet/clarify once if details missing; then analyze
 
 ## 6) Stream contract used
 
-- `data-textDelta` for live text
+- `data-textDelta` for live text (non‑transient so deltas compose smoothly)
 - `data-part`: `tool-input-available`, `tool-output-available`, `source-url`, `finish-step`, `planner-state`
 - Event shape aligned to AI SDK expectations (fixes earlier 500s)
 
 ## 7) Behavior and guardrails
 
-- Router fallbacks
-  - If uncertain or slow, choose `plan` after 2s
-  - After planning once, force a specialist to avoid loops
-  - End run after the first specialist (expandable later)
+- Router + intent
+  - First message with explicit intent (from quick prompts) routes directly to that specialist
+  - Otherwise router may pick `plan`; planner emits `planner-state` and ends; next user reply goes to a specialist
+  - One step per request; end run after each step
 - Abort safety: `abortSignal` passed to all streams; streaming never blocked by DB writes
 - Credits and auth: pre‑existing banners and Clerk flows preserved
+- Input readiness: stream closes at end of step so the composer is active immediately
 
 ## 8) Manual test
 
 1. Hard refresh; ensure `agentsOrchestrator: true`
-2. Click a suggestion (prefixed by `[orchestrator]`)
-3. Expect: “Starting orchestrator…”, then “Router selected: plan”; planner output; purchase advice; panels update
+2. Click a specialist prompt (e.g., “Running cost analysis”)
+3. Expect: immediate short ask if details missing; input is ready; after reply, specialist streams analysis with sources
 4. Verify Convex `runs` and `steps` rows were created
 
 ## 9) Follow‑ups
 
-- Implement Running Cost and Reliability specialists
+- Persist last `planner-state` in Convex and pass to specialists automatically
 - Emit real citations from tools and link `[1]`, `[2]` inline
 - Optional: resumable streams
 - Replace `priceLookup`/`specLookup` stubs with real providers

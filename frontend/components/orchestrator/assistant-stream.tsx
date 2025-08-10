@@ -24,7 +24,9 @@ export function AssistantStream() {
   return (
     <div className="mx-auto w-full md:max-w-3xl px-4 pb-2">
       <div className="prose dark:prose-invert max-w-none leading-6">
-        <Markdown>{text}</Markdown>
+        <div className="first:mt-0 [&_*:first-child]:mt-0">
+          <Markdown>{text}</Markdown>
+        </div>
       </div>
       {citations.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-2 text-xs">

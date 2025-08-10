@@ -22,11 +22,12 @@ export async function reliabilityAgent(ctx: RunContext) {
 
   // Ask for details if missing
   const lastUser = [...(ctx.messages as any[])].reverse().find((m: any) => m.role === 'user');
-  const text = typeof lastUser?.content === 'string'
+  const raw = typeof lastUser?.content === 'string'
     ? (lastUser?.content as string)
     : Array.isArray((lastUser as any)?.parts)
       ? (lastUser as any).parts.filter((p: any) => p?.type === 'text').map((p: any) => p.text).join(' ')
       : '';
+  const text = raw.replace(/[,]/g, ' ').replace(/\s+/g, ' ').trim();
   if (!/\b[a-z]{2,}\b/i.test(text)) {
     async function* ask() {
       const msg = 'Which car should I check reliability for? Please include make, model, and year.';

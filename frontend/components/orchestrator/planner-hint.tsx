@@ -2,10 +2,13 @@
 
 import { useState } from 'react';
 import { featureFlags } from '@/lib/feature-flags';
+import { useDataStream } from '@/components/data-stream-provider';
 
 export function PlannerHint() {
   const [hidden, setHidden] = useState(false);
-  if (!featureFlags.agentsOrchestrator || hidden) return null;
+  const { dataStream } = useDataStream();
+  const specialistActive = dataStream.some((p: any) => p.type === 'data-part' && p.data?.type === 'status' && /Router selected: (purchase_advice|running_cost|reliability)/i.test(p.data.text || ''));
+  if (!featureFlags.agentsOrchestrator || hidden || specialistActive) return null;
   return (
     <div className="mx-auto w-full md:max-w-3xl px-4 pb-2 text-xs text-muted-foreground">
       <div className="rounded-md border bg-muted/30 px-3 py-2 flex items-start justify-between gap-4">

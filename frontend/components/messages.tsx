@@ -67,7 +67,7 @@ function PureMessages({
           regenerate={regenerate}
           isReadonly={isReadonly}
           requiresScrollPadding={
-            hasSentMessage && index === messages.length - 1
+            hasSentMessage && index === messages.length - 1 && !featureFlags.agentsOrchestrator
           }
         />
       ))}

@@ -12,11 +12,12 @@ export async function runningCostAgent(ctx: RunContext) {
 
   // Try to extract target car from the latest messages if present
   const lastUser = [...ctx.messages].reverse().find((m: any) => m.role === 'user');
-  const text = typeof lastUser?.content === 'string'
+  const raw = typeof lastUser?.content === 'string'
     ? (lastUser?.content as string)
     : Array.isArray((lastUser as any)?.parts)
       ? (lastUser as any).parts.filter((p: any) => p?.type === 'text').map((p: any) => p.text).join(' ')
       : '';
+  const text = raw.replace(/[,]/g, ' ').replace(/\s+/g, ' ').trim();
   // Very loose regex extraction (best-effort)
   const yearMatch = text.match(/\b(19|20)\d{2}\b/);
   const year = yearMatch ? Number(yearMatch[0]) : undefined;

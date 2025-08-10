@@ -147,6 +147,13 @@ export function Chat({
   });
 
   // Clear UI data stream and orchestrator state at the start of a new send
+  useEffect(() => {
+    if (status === 'submitted') {
+      setDataStream([]);
+      resetOrchestrator();
+    }
+  }, [status, setDataStream, resetOrchestrator]);
+
   // Clear on new conversation mount or when navigating back to an empty chat
   useEffect(() => {
     if (messages.length === 0) {
@@ -199,23 +206,25 @@ export function Chat({
           )}
         </form>
       </div>
-
-      <Artifact
-        chatId={id}
-        input={input}
-        setInput={setInput}
-        status={status}
-        stop={stop}
-        attachments={attachments}
-        setAttachments={setAttachments}
-        sendMessage={sendMessage}
-        messages={messages}
-        setMessages={setMessages}
-        regenerate={regenerate}
-        votes={votes}
-        isReadonly={isReadonly}
-        selectedVisibilityType={visibilityType}
-      />
+      {/* Hide artifact overlay during orchestrator runs to avoid empty panel space */}
+      {!featureFlags.agentsOrchestrator && (
+        <Artifact
+          chatId={id}
+          input={input}
+          setInput={setInput}
+          status={status}
+          stop={stop}
+          attachments={attachments}
+          setAttachments={setAttachments}
+          sendMessage={sendMessage}
+          messages={messages}
+          setMessages={setMessages}
+          regenerate={regenerate}
+          votes={votes}
+          isReadonly={isReadonly}
+          selectedVisibilityType={visibilityType}
+        />
+      )}
     </>
   );
 }

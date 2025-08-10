@@ -31,13 +31,30 @@ export async function purchaseAdviceAgent(ctx: RunContext) {
     plan = object ?? {};
   } catch {
     const lastUser = [...(ctx.messages as any[])].reverse().find((m: any) => m.role === 'user');
-    const text = typeof lastUser?.content === 'string'
+    const raw = typeof lastUser?.content === 'string'
       ? (lastUser?.content as string)
       : Array.isArray((lastUser as any)?.parts)
         ? (lastUser as any).parts.filter((p: any) => p?.type === 'text').map((p: any) => p.text).join(' ')
         : '';
+    const text = raw.replace(/[,]/g, ' ').replace(/\s+/g, ' ').trim();
     const yearMatch = text.match(/\b(19|20)\d{2}\b/);
-    plan = { year: yearMatch ? Number(yearMatch[0]) : undefined, focus: ['value'] } as any;
+    const year = yearMatch ? Number(yearMatch[0]) : undefined;
+    const fuelMatch = text.toLowerCase().match(/\b(petrol|diesel|hybrid|ev|electric)\b/);
+    const fuel = fuelMatch ? fuelMatch[1] : undefined;
+    // Heuristic parse: first word as make, words until year/fuel as model
+    const tokens = text.split(' ');
+    let make: string | undefined = undefined;
+    let modelTokens: string[] = [];
+    if (tokens.length >= 2) {
+      make = tokens[0];
+      for (let i = 1; i < tokens.length; i++) {
+        const t = tokens[i];
+        if (/^(19|20)\d{2}$/.test(t) || /^(petrol|diesel|hybrid|ev|electric)$/i.test(t)) break;
+        modelTokens.push(t);
+      }
+    }
+    const model = modelTokens.join(' ') || undefined;
+    plan = { make, model, year, focus: ['value'] } as any;
   }
 
   // If not enough details, ask a concise clarification and end quickly
