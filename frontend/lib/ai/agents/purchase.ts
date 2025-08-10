@@ -19,13 +19,26 @@ export async function purchaseAdviceAgent(ctx: RunContext) {
   const ui = emit(ctx.ui);
 
   // 1) Derive a short plan (structured) from the dialog
-  const { object: plan } = await generateObject({
-    model: getModel(ctx.selectedChatModel),
-    schema: PlanSchema,
-    messages: ctx.messages,
-    abortSignal: ctx.signal,
-    system: 'Extract target car (make/model/year) and user focus to guide purchase advice.',
-  });
+  let plan: z.infer<typeof PlanSchema> = {};
+  try {
+    const { object } = await generateObject({
+      model: getModel(ctx.selectedChatModel),
+      schema: PlanSchema,
+      messages: ctx.messages,
+      abortSignal: ctx.signal,
+      system: 'Extract target car (make/model/year) and user focus to guide purchase advice.',
+    });
+    plan = object ?? {};
+  } catch {
+    const lastUser = [...(ctx.messages as any[])].reverse().find((m: any) => m.role === 'user');
+    const text = typeof lastUser?.content === 'string'
+      ? (lastUser?.content as string)
+      : Array.isArray((lastUser as any)?.parts)
+        ? (lastUser as any).parts.filter((p: any) => p?.type === 'text').map((p: any) => p.text).join(' ')
+        : '';
+    const yearMatch = text.match(/\b(19|20)\d{2}\b/);
+    plan = { year: yearMatch ? Number(yearMatch[0]) : undefined, focus: ['value'] } as any;
+  }
 
   // 2) Run tools (spec + price + web) sequentially now; can parallelize later
   ui.toolStart('specLookup', plan);
