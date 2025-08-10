@@ -1,9 +1,30 @@
-import { streamText, smoothStream } from 'ai';
+import { streamText, smoothStream, generateObject } from 'ai';
 import { getModel } from '../model';
 import { emit } from './emit';
+import { z } from 'zod';
 
 export async function plannerAgent(ctx: any) {
   const ui = emit(ctx.ui);
+
+  // Derive a concise normalized car object first
+  const CarSchema = z.object({
+    make: z.string().optional(),
+    model: z.string().optional(),
+    year: z.number().int().optional(),
+    body: z.string().optional(),
+    trim: z.string().optional(),
+    engine: z.string().optional(),
+    questions: z.array(z.string()).optional(),
+  });
+
+  const { object: plan } = await generateObject({
+    model: getModel(ctx.selectedChatModel),
+    schema: CarSchema,
+    messages: ctx.messages,
+    abortSignal: ctx.signal,
+    system:
+      'Extract a minimal normalized car {make, model, year, body?, trim?, engine?} and up to 2 clarifying questions if needed.',
+  });
 
   const result: any = await streamText({
     model: getModel(ctx.selectedChatModel),
@@ -23,8 +44,8 @@ export async function plannerAgent(ctx: any) {
         yield text as string;
       }
     }
-    // At the end, emit a lightweight planner-state placeholder for now
-    ui.plannerState({ make: 'Toyota', model: 'Corolla', year: 2018 });
+    // Emit the computed planner-state at the end
+    ui.plannerState(plan);
   }
 
   async function* toolEvents() {
