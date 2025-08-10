@@ -128,6 +128,18 @@ export const POST = withOptionalAuth(async ({ convex, userId, request }) => {
   // Extract message content from parts
   const messageContent = message.parts?.map(p => 'text' in p ? p.text : '').join('') || '';
 
+  // Derive an explicit intent from the latest message to guide the router
+  const intent: 'plan' | 'purchase_advice' | 'running_cost' | 'reliability' | undefined = (() => {
+    const t = messageContent.toLowerCase();
+    if (t.includes('[orchestrator]')) {
+      if (/running cost|running costs|mpg|insurance|tax/.test(t)) return 'running_cost';
+      if (/reliability|common issues|recalls?/.test(t)) return 'reliability';
+      if (/purchase advice|should i buy|compare|vs\b/.test(t)) return 'purchase_advice';
+      return 'plan';
+    }
+    return undefined;
+  })();
+
   // Save user message
   await convex.mutation(api.chats.sendMessage, {
     ui_id: message.id,
@@ -184,6 +196,7 @@ export const POST = withOptionalAuth(async ({ convex, userId, request }) => {
             requestHints,
             userType,
             signal: ac.signal,
+            intent,
           });
         } finally {
           await convex.mutation(api.runs.endRun, { run_id: runId });

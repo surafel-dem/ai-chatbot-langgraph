@@ -26,7 +26,10 @@ export async function runOrchestrator(ctx: any) {
   out.status('Starting orchestrator...');
 
   // Execute exactly one step per request to avoid loops and long busy states
-  const route = await routerAgent(ctx);
+  // If an explicit intent is provided (from quick link), honor it
+  const route = ctx.intent
+    ? { next: ctx.intent === 'plan' ? 'plan' : ctx.intent }
+    : await routerAgent(ctx);
   out.status(`Router selected: ${route.next}`);
   if (route.next === 'finalize') return;
 
