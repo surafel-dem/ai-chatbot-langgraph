@@ -21,7 +21,6 @@ import { requestSuggestions } from '@/lib/ai/tools/request-suggestions';
 import { getWeather } from '@/lib/ai/tools/get-weather';
 import { myProvider } from '@/lib/ai/providers';
 import { entitlementsByUserType } from '@/lib/ai/entitlements';
-import { runOrchestrator } from '@/lib/ai/orchestrator';
 import { postRequestBodySchema } from './schema';
 import { systemPrompt, type RequestHints } from '@/lib/ai/prompts';
 import type { AuthSession, UserType } from '@/lib/auth';
@@ -128,18 +127,6 @@ export const POST = withOptionalAuth(async ({ convex, userId, request }) => {
   // Extract message content from parts
   const messageContent = message.parts?.map(p => 'text' in p ? p.text : '').join('') || '';
 
-  // Derive an explicit intent from the latest message to guide the router
-  const intent: 'plan' | 'purchase_advice' | 'running_cost' | 'reliability' | undefined = (() => {
-    const t = messageContent.toLowerCase();
-    if (t.includes('[orchestrator]')) {
-      if (/running cost|running costs|mpg|insurance|tax/.test(t)) return 'running_cost';
-      if (/reliability|common issues|recalls?/.test(t)) return 'reliability';
-      if (/purchase advice|should i buy|compare|vs\b/.test(t)) return 'purchase_advice';
-      return 'plan';
-    }
-    return undefined;
-  })();
-
   // Save user message
   await convex.mutation(api.chats.sendMessage, {
     ui_id: message.id,
@@ -175,68 +162,37 @@ export const POST = withOptionalAuth(async ({ convex, userId, request }) => {
   await convex.mutation(api.chats.startStream, { stream_id: streamId, chat_id: id });
 
   const stream = createUIMessageStream({
-    execute: async ({ writer: dataStream }) => {
-      if (featureFlags.agentsOrchestrator) {
-        // Orchestrated path
-        const runId = await convex.mutation(api.runs.startRun, {
-          chat_id: id,
-          user_id: userId ?? guestId ?? '',
-          // persist last known planner-state if already computed (optional enhancement)
-          planner_state: undefined,
-        });
+    execute: ({ writer: dataStream }) => {
+      const result = streamText({
+        model: myProvider.languageModel(selectedChatModel),
+        system: systemPrompt({ selectedChatModel, requestHints }),
+        messages: convertToModelMessages(uiMessages),
+        stopWhen: stepCountIs(5),
+        experimental_activeTools:
+          selectedChatModel === 'chat-model-reasoning'
+            ? []
+            : [
+                'getWeather',
+                'createDocument',
+                'updateDocument',
+                'requestSuggestions',
+              ],
+        experimental_transform: smoothStream({ chunking: 'word' }),
+        tools: {
+          getWeather,
+          createDocument: createDocument({ session, dataStream }),
+          updateDocument: updateDocument({ session, dataStream }),
+          requestSuggestions: requestSuggestions({ session, dataStream }),
+        },
+      });
 
-        try {
-          const ac = new AbortController();
-          await runOrchestrator({
-            ui: dataStream,
-            messages: convertToModelMessages(uiMessages),
-            chatId: id,
-            runId,
-            userId: userId ?? guestId ?? '',
-            convex,
-            selectedChatModel,
-            requestHints,
-            userType,
-            signal: ac.signal,
-            intent,
-          });
-        } finally {
-          await convex.mutation(api.runs.endRun, { run_id: runId });
-          // Orchestrator will explicitly call ui.done() at the end of each step; avoid double-close here
-        }
-      } else {
-        // Existing chat-only path (kept intact)
-        const result = streamText({
-          model: myProvider.languageModel(selectedChatModel),
-          system: systemPrompt({ selectedChatModel, requestHints }),
-          messages: convertToModelMessages(uiMessages),
-          stopWhen: stepCountIs(5),
-          experimental_activeTools:
-            selectedChatModel === 'chat-model-reasoning'
-              ? []
-              : [
-                  'getWeather',
-                  'createDocument',
-                  'updateDocument',
-                  'requestSuggestions',
-                ],
-          experimental_transform: smoothStream({ chunking: 'word' }),
-          tools: {
-            getWeather,
-            createDocument: createDocument({ session, dataStream }),
-            updateDocument: updateDocument({ session, dataStream }),
-            requestSuggestions: requestSuggestions({ session, dataStream }),
-          },
-        });
+      result.consumeStream();
 
-        result.consumeStream();
-
-        dataStream.merge(
-          result.toUIMessageStream({
-            sendReasoning: true,
-          }),
-        );
-      }
+      dataStream.merge(
+        result.toUIMessageStream({
+          sendReasoning: true,
+        }),
+      );
     },
     generateId: generateUUID,
     onFinish: async ({ messages }) => {

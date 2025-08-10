@@ -253,7 +253,7 @@ export default defineSchema({
     .index("by_stream_id", ["stream_id"])
     .index("by_status", ["status"]),
 
-  // Orchestrator telemetry
+  // Orchestrated research runs (specialists)
   runs: defineTable({
     chat_id: v.string(),
     user_id: v.string(),
@@ -270,12 +270,12 @@ export default defineSchema({
     ended_at: v.optional(v.number()),
     error: v.optional(v.string()),
   })
-    .index("by_chat", ["chat_id"]) 
+    .index("by_chat", ["chat_id"])
     .index("by_user", ["user_id"]),
 
   steps: defineTable({
     run_id: v.id("runs"),
-    role: v.string(),
+    role: v.string(), // "router" | "planner" | "specialist" | "tool" | "synthesis"
     name: v.string(),
     started_at: v.number(),
     ended_at: v.optional(v.number()),
@@ -287,8 +287,8 @@ export default defineSchema({
   tool_calls: defineTable({
     step_id: v.id("steps"),
     name: v.string(),
-    input: v.optional(v.any()),
-    output: v.optional(v.any()),
+    input: v.any(),
+    output: v.any(),
     started_at: v.number(),
     ended_at: v.optional(v.number()),
   }).index("by_step", ["step_id"]),

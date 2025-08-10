@@ -6,7 +6,6 @@ import { memo } from 'react';
 import type { UseChatHelpers } from '@ai-sdk/react';
 import type { VisibilityType } from './visibility-selector';
 import type { ChatMessage } from '@/lib/types';
-import { featureFlags } from '@/lib/feature-flags';
 
 interface SuggestedActionsProps {
   chatId: string;
@@ -19,51 +18,28 @@ function PureSuggestedActions({
   sendMessage,
   selectedVisibilityType,
 }: SuggestedActionsProps) {
-  const suggestedActions = featureFlags.agentsOrchestrator
-    ? [
-        {
-          title: 'Purchase advice',
-          label: 'value, trims, price bands',
-          action: 'Purchase advice',
-        },
-        {
-          title: 'Running costs',
-          label: 'fuel, tax, insurance, service',
-          action: 'Running cost analysis',
-        },
-        {
-          title: 'Reliability',
-          label: 'common issues, recalls, what to inspect',
-          action: 'Check reliability',
-        },
-        {
-          title: 'Plan first',
-          label: 'normalize make/model/year',
-          action: 'Plan car analysis',
-        },
-      ]
-    : [
-        {
-          title: 'What are the advantages',
-          label: 'of using Next.js?',
-          action: 'What are the advantages of using Next.js?',
-        },
-        {
-          title: 'Write code to',
-          label: `demonstrate djikstra's algorithm`,
-          action: `Write code to demonstrate djikstra's algorithm`,
-        },
-        {
-          title: 'Help me write an essay',
-          label: `about silicon valley`,
-          action: `Help me write an essay about silicon valley`,
-        },
-        {
-          title: 'What is the weather',
-          label: 'in San Francisco?',
-          action: 'What is the weather in San Francisco?',
-        },
-      ];
+  const suggestedActions = [
+    {
+      title: 'What are the advantages',
+      label: 'of using Next.js?',
+      action: 'What are the advantages of using Next.js?',
+    },
+    {
+      title: 'Write code to',
+      label: `demonstrate djikstra's algorithm`,
+      action: `Write code to demonstrate djikstra's algorithm`,
+    },
+    {
+      title: 'Help me write an essay',
+      label: `about silicon valley`,
+      action: `Help me write an essay about silicon valley`,
+    },
+    {
+      title: 'What is the weather',
+      label: 'in San Francisco?',
+      action: 'What is the weather in San Francisco?',
+    },
+  ];
 
   return (
     <div
@@ -84,12 +60,9 @@ function PureSuggestedActions({
             onClick={async () => {
               window.history.replaceState({}, '', `/chat/${chatId}`);
 
-              // Force orchestrator mode by tagging the message
               sendMessage({
                 role: 'user',
-                parts: [
-                  { type: 'text', text: `[orchestrator] ${suggestedAction.action}` },
-                ],
+                parts: [{ type: 'text', text: suggestedAction.action }],
               });
             }}
             className="text-left border rounded-xl px-4 py-3.5 text-sm flex-1 gap-1 sm:flex-col w-full h-auto justify-start items-start"

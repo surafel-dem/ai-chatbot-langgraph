@@ -23,13 +23,6 @@ import { ChatSDKError } from '@/lib/errors';
 import type { Attachment, ChatMessage } from '@/lib/types';
 import { useDataStream } from './data-stream-provider';
 import { useUser } from '@clerk/nextjs';
-import { featureFlags } from '@/lib/feature-flags';
-import { useOrchestratorStore } from '@/stores/orchestrator-store';
-import { PlannerPanel } from './orchestrator/planner-panel';
-import { SourcesPanel } from './orchestrator/sources-panel';
-import { ProgressPanel } from './orchestrator/progress-panel';
-import { AssistantStream } from './orchestrator/assistant-stream';
-import { PlannerHint } from './orchestrator/planner-hint';
 
 export function Chat({
   id,
@@ -135,26 +128,12 @@ export function Chat({
   const [attachments, setAttachments] = useState<Array<Attachment>>([]);
   const isArtifactVisible = useArtifactSelector((state) => state.isVisible);
 
-  // Read minimal orchestrator state (for optional small inline indicators)
-  // Orchestrator state kept internal; UI shows only answer + sources for now
-  const resetOrchestrator = useOrchestratorStore((s) => s.reset);
-
   useAutoResume({
     autoResume,
     initialMessages,
     resumeStream,
     setMessages,
   });
-
-  // Do NOT clear the UI data stream on submit; let the previous run's text persist
-
-  // Clear on new conversation mount or when navigating back to an empty chat
-  useEffect(() => {
-    if (messages.length === 0) {
-      setDataStream([]);
-      resetOrchestrator();
-    }
-  }, [messages.length, setDataStream, resetOrchestrator]);
 
   return (
     <>
@@ -178,10 +157,6 @@ export function Chat({
           isArtifactVisible={isArtifactVisible}
         />
 
-        {featureFlags.agentsOrchestrator && <PlannerHint />}
-
-        {/* Panels are rendered inline inside <Messages /> to avoid duplicates */}
-
         <form className="flex mx-auto px-4 bg-background pb-4 md:pb-6 gap-2 w-full md:max-w-3xl">
           {!isReadonly && (
             <MultimodalInput
@@ -200,25 +175,23 @@ export function Chat({
           )}
         </form>
       </div>
-      {/* Hide artifact overlay during orchestrator runs to avoid empty panel space */}
-      {!featureFlags.agentsOrchestrator && (
-        <Artifact
-          chatId={id}
-          input={input}
-          setInput={setInput}
-          status={status}
-          stop={stop}
-          attachments={attachments}
-          setAttachments={setAttachments}
-          sendMessage={sendMessage}
-          messages={messages}
-          setMessages={setMessages}
-          regenerate={regenerate}
-          votes={votes}
-          isReadonly={isReadonly}
-          selectedVisibilityType={visibilityType}
-        />
-      )}
+
+      <Artifact
+        chatId={id}
+        input={input}
+        setInput={setInput}
+        status={status}
+        stop={stop}
+        attachments={attachments}
+        setAttachments={setAttachments}
+        sendMessage={sendMessage}
+        messages={messages}
+        setMessages={setMessages}
+        regenerate={regenerate}
+        votes={votes}
+        isReadonly={isReadonly}
+        selectedVisibilityType={visibilityType}
+      />
     </>
   );
 }

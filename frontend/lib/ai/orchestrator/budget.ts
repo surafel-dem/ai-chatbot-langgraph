@@ -1,5 +1,5 @@
 export const MAX_STEPS = 8;
-export const TOOL_TIMEOUT_MS = 12_000;
+export const TOOL_TIMEOUT_MS = 12000;
 
 export async function withTimeout<T>(p: Promise<T>, ms = TOOL_TIMEOUT_MS): Promise<T> {
   return await Promise.race([
@@ -20,4 +20,4 @@ export async function withRetries<T>(fn: () => Promise<T>, retries = 2): Promise
   }
 }
 
-
+ 

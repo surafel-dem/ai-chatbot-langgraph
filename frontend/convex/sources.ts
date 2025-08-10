@@ -5,8 +5,7 @@ export const addMany = mutation({
   args: { run_id: v.id("runs"), items: v.any() },
   handler: async (ctx, { run_id, items }) => {
     let order = 1;
-    const list = (items as any[]) ?? [];
-    for (const s of list) {
+    for (const s of (items as any[]) ?? []) {
       await ctx.db.insert("sources", {
         run_id,
         url: s.url,
@@ -19,4 +18,4 @@ export const addMany = mutation({
   },
 });
 
-
+ 

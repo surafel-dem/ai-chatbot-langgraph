@@ -20,7 +20,7 @@ export type NextStep =
 
 export interface RunContext {
   ui: any; // UIMessageStreamWriter from 'ai'
-  messages: any[]; // AI SDK message format
+  messages: any[]; // AI SDK UI messages
   chatId: string;
   runId: string;
   userId: string;
@@ -30,4 +30,4 @@ export interface RunContext {
   intent?: 'plan' | 'analyze';
 }
 
-
+ 

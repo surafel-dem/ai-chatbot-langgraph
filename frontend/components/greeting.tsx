@@ -1,5 +1,4 @@
 import { motion } from 'framer-motion';
-import { featureFlags } from '@/lib/feature-flags';
 
 export const Greeting = () => {
   return (
@@ -23,9 +22,7 @@ export const Greeting = () => {
         transition={{ delay: 0.6 }}
         className="text-2xl text-zinc-500"
       >
-        {featureFlags.agentsOrchestrator
-          ? 'Car analysis mode: planning + specialist agents.'
-          : 'How can I help you today?'}
+        How can I help you today?
       </motion.div>
     </div>
   );

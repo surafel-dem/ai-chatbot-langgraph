@@ -16,13 +16,6 @@ A modern, full-stack AI chatbot application built with **Next.js 15**, **Convex*
 - **Message History** - Persistent chat history for registered users
 - **Streaming Responses** - Real-time AI response streaming
 
-### 🧭 **Agents Orchestrator (Car Analysis)**
-- **Planner + Specialists** (Purchase Advice, Running Cost, Reliability) using AI SDK UI Data Stream
-- **Direct specialist routing** from quick prompts (no hardcoded car text). If details are missing, the specialist greets/asks once and ends the turn so the input stays active
-- **Single-step per request**: each send runs exactly one step (planner or one specialist). The stream closes at the end so you can reply immediately
-- **Live citations**: sources appear as numbered badges under the streamed answer
-- **Clean UI**: no stage badges; artifact overlay is suppressed during agent runs
-
 ### 📁 **File Management**
 - **Convex Storage** - Built-in file storage (up to 4GB per file)
 - **File Uploads** - Drag & drop file uploads with progress indicators
@@ -53,7 +46,6 @@ A modern, full-stack AI chatbot application built with **Next.js 15**, **Convex*
 - **Authentication**: Clerk
 - **File Storage**: Convex Storage
 - **AI**: AI SDK v4 with provider support (OpenAI, Anthropic, etc.)
-- **Agents**: Orchestrator built on AI SDK streaming + typed UI parts (data-textDelta, data-part)
 - **UI**: Radix UI, Shadcn/ui, Framer Motion
 - **Code Editor**: CodeMirror 6
 - **Package Manager**: Bun
@@ -373,13 +365,6 @@ const anthropic = createAnthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 ```
-
-### Orchestrator Flow
-
-- Quick prompts send intent → router routes directly to a specialist; otherwise router may use the planner
-- Planner normalizes the car and may ask one clarification; ends the step
-- Specialists run one step and stream markdown with sources; input becomes ready immediately after the step ends
-
 
 ## 🧹 Auto-cleanup System
 

@@ -8,9 +8,6 @@ import { motion } from 'framer-motion';
 import { useMessages } from '@/hooks/use-messages';
 import type { ChatMessage } from '@/lib/types';
 import { useDataStream } from './data-stream-provider';
-import { featureFlags } from '@/lib/feature-flags';
-import { SourcesPanel } from './orchestrator/sources-panel';
-import { AssistantStream } from './orchestrator/assistant-stream';
 
 interface MessagesProps {
   chatId: string;
@@ -67,21 +64,14 @@ function PureMessages({
           regenerate={regenerate}
           isReadonly={isReadonly}
           requiresScrollPadding={
-            hasSentMessage && index === messages.length - 1 && !featureFlags.agentsOrchestrator
+            hasSentMessage && index === messages.length - 1
           }
         />
       ))}
 
-      {!featureFlags.agentsOrchestrator && status === 'submitted' &&
+      {status === 'submitted' &&
         messages.length > 0 &&
         messages[messages.length - 1].role === 'user' && <ThinkingMessage />}
-
-      {featureFlags.agentsOrchestrator && (
-        <>
-          <AssistantStream />
-          <SourcesPanel />
-        </>
-      )}
 
       <motion.div
         ref={messagesEndRef}

@@ -4,20 +4,12 @@ import { useEffect, useRef } from 'react';
 import { artifactDefinitions } from './artifact';
 import { initialArtifactData, useArtifact } from '@/hooks/use-artifact';
 import { useDataStream } from './data-stream-provider';
-import { useOrchestratorStore } from '@/stores/orchestrator-store';
-import { featureFlags } from '@/lib/feature-flags';
 
 export function DataStreamHandler() {
   const { dataStream } = useDataStream();
 
   const { artifact, setArtifact, setMetadata } = useArtifact();
   const lastProcessedIndex = useRef(-1);
-  const setPlanner = useOrchestratorStore((s) => s.setPlannerState);
-  const addSource = useOrchestratorStore((s) => s.addSource);
-  const markStepFinished = useOrchestratorStore((s) => s.markStepFinished);
-  const addStatus = useOrchestratorStore((s) => s.addStatus);
-  const addCitation = useOrchestratorStore((s) => s.addCitation);
-  const resetCitations = useOrchestratorStore((s) => s.resetCitations);
 
   useEffect(() => {
     if (!dataStream?.length) return;
@@ -26,42 +18,16 @@ export function DataStreamHandler() {
     lastProcessedIndex.current = dataStream.length - 1;
 
     newDeltas.forEach((delta) => {
-      // Handle orchestrator-specific parts without disrupting existing artifact logic
-      if (delta.type === 'data-textDelta') {
-        // AssistantStream listens to these; nothing else to do here
-      }
-      if (delta.type === 'data-part' && typeof delta.data === 'object' && delta.data) {
-        const kind = (delta.data as any).type;
-        if (kind === 'planner-state') {
-          const ps = (delta.data as any).selectedCar ?? (delta.data as any);
-          setPlanner(ps);
-        }
-        if (kind === 'source-url') {
-          const url = (delta.data as any).url;
-          const title = (delta.data as any).title;
-          addSource({ url, title });
-          // Sequential index for inline [n]
-          addCitation({ index: undefined as any, url, title });
-        }
-        if (kind === 'finish-step') {
-          markStepFinished();
-        }
-        if (kind === 'status') {
-          addStatus({ text: (delta.data as any).text, level: (delta.data as any).level });
-        }
-      }
-      // Suppress artifact-driven modal opening during orchestrator mode
-      if (!featureFlags.agentsOrchestrator) {
-        const artifactDefinition = artifactDefinitions.find(
-          (artifactDefinition) => artifactDefinition.kind === artifact.kind,
-        );
-        if (artifactDefinition?.onStreamPart) {
-          artifactDefinition.onStreamPart({
-            streamPart: delta,
-            setArtifact,
-            setMetadata,
-          });
-        }
+      const artifactDefinition = artifactDefinitions.find(
+        (artifactDefinition) => artifactDefinition.kind === artifact.kind,
+      );
+
+      if (artifactDefinition?.onStreamPart) {
+        artifactDefinition.onStreamPart({
+          streamPart: delta,
+          setArtifact,
+          setMetadata,
+        });
       }
 
       setArtifact((draftArtifact) => {
@@ -98,7 +64,7 @@ export function DataStreamHandler() {
               status: 'streaming',
             };
 
-      case 'data-finish':
+          case 'data-finish':
             return {
               ...draftArtifact,
               status: 'idle',
