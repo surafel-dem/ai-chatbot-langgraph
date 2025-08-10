@@ -138,6 +138,7 @@ export function Chat({
   // Read minimal orchestrator state (for optional small inline indicators)
   const plannerState = useOrchestratorStore((s) => s.plannerState);
   const finishedSteps = useOrchestratorStore((s) => s.finishedSteps);
+  const resetOrchestrator = useOrchestratorStore((s) => s.reset);
 
   useAutoResume({
     autoResume,
@@ -145,6 +146,15 @@ export function Chat({
     resumeStream,
     setMessages,
   });
+
+  // Clear UI data stream and orchestrator state at the start of a new send
+  // Clear on new conversation mount or when navigating back to an empty chat
+  useEffect(() => {
+    if (messages.length === 0) {
+      setDataStream([]);
+      resetOrchestrator();
+    }
+  }, [messages.length, setDataStream, resetOrchestrator]);
 
   return (
     <>
@@ -170,14 +180,7 @@ export function Chat({
 
         {featureFlags.agentsOrchestrator && <PlannerHint />}
 
-        {featureFlags.agentsOrchestrator && (
-          <>
-            <PlannerPanel />
-            <SourcesPanel />
-            <ProgressPanel />
-            <AssistantStream />
-          </>
-        )}
+        {/* Panels are rendered inline inside <Messages /> to avoid duplicates */}
 
         <form className="flex mx-auto px-4 bg-background pb-4 md:pb-6 gap-2 w-full md:max-w-3xl">
           {!isReadonly && (

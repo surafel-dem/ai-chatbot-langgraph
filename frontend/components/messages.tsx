@@ -81,9 +81,11 @@ function PureMessages({
       {featureFlags.agentsOrchestrator && (
         <>
           <PlannerPanel />
-          <SourcesPanel />
-          <ProgressPanel />
+          {/* Sources list and Answer stream */}
           <AssistantStream />
+          <SourcesPanel />
+          {/* Debug statuses are hidden by default; still show step count chip */}
+          <ProgressPanel />
         </>
       )}
 

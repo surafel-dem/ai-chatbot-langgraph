@@ -5,6 +5,8 @@ export const featureFlags = {
   agentsOrchestrator: true,
   // New research canvas layout (Perplexity-style). Keep old UI as fallback
   researchCanvas: true,
+  // Show low-level agent status lines (debug only). Keep OFF for clean UI.
+  agentDebugStatus: false,
 };
 
 

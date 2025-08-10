@@ -13,7 +13,7 @@ export function ProgressPanel() {
           <span>Progress</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-foreground/10 text-foreground/70">{finishedSteps} steps</span>
         </div>
-        {statuses.length > 0 && (
+        {featureFlags.agentDebugStatus && statuses.length > 0 && (
           <ul className="mt-2 space-y-1">
             {statuses.slice(-8).map((s, i) => (
               <li key={i} className="leading-5">
