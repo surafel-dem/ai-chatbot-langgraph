@@ -16,6 +16,8 @@ export function DataStreamHandler() {
   const addSource = useOrchestratorStore((s) => s.addSource);
   const markStepFinished = useOrchestratorStore((s) => s.markStepFinished);
   const addStatus = useOrchestratorStore((s) => s.addStatus);
+  const addCitation = useOrchestratorStore((s) => s.addCitation);
+  const resetCitations = useOrchestratorStore((s) => s.resetCitations);
 
   useEffect(() => {
     if (!dataStream?.length) return;
@@ -34,7 +36,11 @@ export function DataStreamHandler() {
           setPlanner((delta.data as any).selectedCar ?? (delta.data as any));
         }
         if (kind === 'source-url') {
-          addSource({ url: (delta.data as any).url, title: (delta.data as any).title });
+          const url = (delta.data as any).url;
+          const title = (delta.data as any).title;
+          addSource({ url, title });
+          // Sequential index for inline [n]
+          addCitation({ index: undefined as any, url, title });
         }
         if (kind === 'finish-step') {
           markStepFinished();
@@ -91,7 +97,7 @@ export function DataStreamHandler() {
               status: 'streaming',
             };
 
-          case 'data-finish':
+      case 'data-finish':
             return {
               ...draftArtifact,
               status: 'idle',

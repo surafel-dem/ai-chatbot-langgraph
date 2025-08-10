@@ -3,6 +3,8 @@ export const featureFlags = {
   credits: true,
   // Enables orchestrator agents (router → planner → specialists) and UI panels
   agentsOrchestrator: true,
+  // New research canvas layout (Perplexity-style). Keep old UI as fallback
+  researchCanvas: true,
 };
 
 
