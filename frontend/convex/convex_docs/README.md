@@ -72,6 +72,12 @@ npx convex env remove --prod
 - ✅ **Migration**: Anonymous → authenticated seamless transition
 - ✅ **Security**: Ownership verification on all queries; production auth logs removed
 - ✅ **Performance**: Optimized indexing and query patterns
+ - ✅ **Credits (Registered Users)**: `users.credits` and `users.reserved_credits` fields added; server functions in `convex/credits.ts`:
+   - `credits.getUserCreditsInfo`
+   - `credits.reserveAvailableCredits`
+   - `credits.finalizeCreditsUsage`
+   - `credits.releaseReservedCredits`
+   - Initialized in `users.ensureUser`
 
 ---
 

@@ -39,6 +39,9 @@ export const ensureUser = mutation({
       await ctx.db.patch(existingUser._id, {
         last_seen_at: Date.now(),
         updated_at: Date.now(),
+        // Initialize credits defaults if missing
+        ...(existingUser.credits === undefined && { credits: 1000 }),
+        ...(existingUser.reserved_credits === undefined && { reserved_credits: 0 }),
       });
       return existingUser._id;
     }
@@ -54,6 +57,8 @@ export const ensureUser = mutation({
       message_count: 0,
       chat_count: 0,
       document_count: 0,
+      credits: 1000,
+      reserved_credits: 0,
       created_at: now,
       updated_at: now,
       last_seen_at: now,

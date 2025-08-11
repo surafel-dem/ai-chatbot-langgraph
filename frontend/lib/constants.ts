@@ -7,3 +7,11 @@ export const isTestEnvironment = Boolean(
 );
 
 export const guestRegex = /^guest-\d+$/;
+
+export const ANONYMOUS_SESSION_COOKIES_KEY = 'anonymous-session';
+
+// Anonymous limits (read-only wiring for now)
+export const ANONYMOUS_LIMITS = {
+  CREDITS: process.env.NODE_ENV === 'production' ? 10 : 1000,
+  SESSION_DURATION: 60 * 60 * 24, // seconds
+} as const;

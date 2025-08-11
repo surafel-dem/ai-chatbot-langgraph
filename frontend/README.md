@@ -12,8 +12,17 @@ A modern, full-stack AI chatbot application built with **Next.js 15**, **Convex*
 ### 💬 **Chat System**
 - **Real-time Messaging** - Instant message delivery with Convex reactivity
 - **AI Integration** - Support for OpenAI, Anthropic, and other AI SDK providers
+- **Credits (feature-flagged)**
+  - Guests: daily cookie credits (prod default 10). Each send decrements a base model cost; CTA at 0. Banner shows remaining credits.
+  - Registered: unlimited for now; Convex credit reservation/finalization scaffolded for future paid plans.
 - **Message History** - Persistent chat history for registered users
 - **Streaming Responses** - Real-time AI response streaming
+
+### 🧠 **Specialists & Orchestrator (in progress)**
+- **Specialists**: Reliability Analysis (first), Running Cost, Purchase Advice
+- **Orchestrator**: Routes free-form chat or Quick Selections to a specialist run; manages confirmation stage (e.g., car make/model/year) and streams step-by-step progress
+- **AI Elements UI**: Conversation (auto-scroll), Response (streaming markdown), Task (progress), Actions (quick selections)
+- See `docs/ORCHESTRATOR_MIGRATION.md` and `new_feauture.md` for the migration plan
 
 ### 📁 **File Management**
 - **Convex Storage** - Built-in file storage (up to 4GB per file)
@@ -34,7 +43,7 @@ A modern, full-stack AI chatbot application built with **Next.js 15**, **Convex*
 - **Statistics** - View voting statistics per chat
 
 ### 🧹 **Auto-cleanup**
-- **Guest Data** - Automatic cleanup of guest sessions after 24 hours
+- **Guest Data** - Automatic cleanup of guest sessions after 24 hours (guest credits reset daily via cookie TTL)
 - **File Expiration** - Temporary files removed automatically
 - **Database Health** - Automated maintenance to prevent bloat
 
@@ -363,6 +372,18 @@ const openai = createOpenAI({
 const anthropic = createAnthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
+```
+### AI Elements (UI)
+- Conversation (auto-scroll chat)
+- Response (streaming-optimized markdown)
+- Task (orchestrated steps/progress)
+- Actions (quick selections)
+Install:
+```
+npx ai-elements@latest add conversation
+npx ai-elements@latest add response
+npx ai-elements@latest add task
+npx ai-elements@latest add actions
 ```
 
 ## 🧹 Auto-cleanup System

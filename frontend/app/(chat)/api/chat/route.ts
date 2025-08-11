@@ -7,6 +7,9 @@ import {
   streamText,
 } from 'ai';
 import { withOptionalAuth, withAuth } from '@/lib/api-handler';
+import { featureFlags } from '@/lib/feature-flags';
+import { getAnonymousSession, setAnonymousSession, createAnonymousSession } from '@/lib/anonymous-session-server';
+import { ANONYMOUS_LIMITS } from '@/lib/constants';
 import { cookies } from 'next/headers';
 import { ApiResponse } from '@/lib/api-response';
 import { api } from "@/convex/_generated/api";
@@ -21,6 +24,7 @@ import { entitlementsByUserType } from '@/lib/ai/entitlements';
 import { postRequestBodySchema } from './schema';
 import { systemPrompt, type RequestHints } from '@/lib/ai/prompts';
 import type { AuthSession, UserType } from '@/lib/auth';
+import { getBaseModelCost, getMaxToolCost, TOOL_CREDIT_COSTS } from '@/lib/ai/tool-costs';
 
 export const maxDuration = 60;
 
@@ -64,6 +68,21 @@ export const POST = withOptionalAuth(async ({ convex, userId, request }) => {
         path: '/',
         maxAge: 60 * 60 * 24 * 30, // 30 days
       });
+    }
+  }
+
+  // --- Optional credits gating (behind feature flag) ---
+  if (featureFlags.credits) {
+    if (userId) {
+      // Reserved credits flow for registered users happens around streaming (future step)
+    } else {
+      // Anonymous: initialize or read cookie session (read-only change for now)
+      let anon = await getAnonymousSession();
+      if (!anon) {
+        anon = await createAnonymousSession();
+        await setAnonymousSession(anon);
+      }
+      // No enforcement yet; only ensures cookie exists for UI banner
     }
   }
 
@@ -116,6 +135,27 @@ export const POST = withOptionalAuth(async ({ convex, userId, request }) => {
     role: 'user',
     parts: message.parts,
   });
+
+  // Optional credits handling (kept behind feature flag for safety)
+  let reservedAmount = 0;
+  const baseModelCost = getBaseModelCost(selectedChatModel);
+  if (featureFlags.credits) {
+    if (userId) {
+      // For now, allow unlimited sends for registered users by skipping reservation.
+      // You can enable reservation later when paid credits go live.
+      reservedAmount = 0;
+    } else {
+      // Guests: decrement cookie credits by base cost upfront
+      const anon = await getAnonymousSession();
+      if (anon) {
+        if ((anon.remainingCredits ?? 0) <= 0) {
+          return ApiResponse.error('You have reached the free limit. Sign in to continue.', 402);
+        }
+        anon.remainingCredits = Math.max(0, (anon.remainingCredits ?? 0) - baseModelCost);
+        await setAnonymousSession(anon);
+      }
+    }
+  }
 
   // Create streaming response
   const streamId = generateUUID();
@@ -171,11 +211,45 @@ export const POST = withOptionalAuth(async ({ convex, userId, request }) => {
         await convex.mutation(api.chats.completeStream, {
           stream_id: streamId,
         });
+
+        // Finalize credits (registered users only; currently disabled)
+        if (false && featureFlags.credits && userId) {
+          const toolCost = messages
+            .flatMap((m) => m.parts || [])
+            .reduce((sum, part: any) => {
+              // Our tools emit UI data; conservatively add cost when tool types are used
+              if (part.type === 'tool-result' && part.toolName && TOOL_CREDIT_COSTS[part.toolName as keyof typeof TOOL_CREDIT_COSTS]) {
+                return sum + TOOL_CREDIT_COSTS[part.toolName as keyof typeof TOOL_CREDIT_COSTS];
+              }
+              return sum;
+            }, 0);
+          const actual = baseModelCost + toolCost;
+          await convex.mutation(api.credits.finalizeCreditsUsage, {
+            user_id: convexUserId,
+            reservedAmount,
+            actualAmount: actual,
+          });
+        }
       } catch (error) {
         console.error('Error saving messages:', error);
       }
     },
-    onError: () => {
+    onError: async () => {
+      // Release credits on error
+      if (featureFlags.credits) {
+        if (userId && reservedAmount > 0) {
+          await convex.mutation(api.credits.releaseReservedCredits, {
+            user_id: convexUserId,
+            amount: reservedAmount,
+          });
+        } else {
+          const anon = await getAnonymousSession();
+          if (anon) {
+            anon.remainingCredits += baseModelCost;
+            await setAnonymousSession(anon);
+          }
+        }
+      }
       return 'An error occurred while processing your request.';
     },
   });

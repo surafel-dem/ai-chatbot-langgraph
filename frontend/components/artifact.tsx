@@ -409,7 +409,7 @@ function PureArtifact({
               },
             }}
           >
-            <div className="p-2 flex flex-row justify-between items-start">
+            <div className="p-2 flex flex-row justify-between items-start border-b dark:border-zinc-700">
               <div className="flex flex-row gap-4 items-start">
                 <ArtifactCloseButton />
 
@@ -447,7 +447,7 @@ function PureArtifact({
               />
             </div>
 
-            <div className="dark:bg-muted bg-background h-full overflow-y-scroll !max-w-full items-center">
+            <div className="dark:bg-muted bg-background h-full overflow-y-scroll !max-w-full items-center prose dark:prose-invert">
               <artifactDefinition.content
                 title={artifact.title}
                 content={

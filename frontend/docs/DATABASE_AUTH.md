@@ -8,6 +8,7 @@ This document consolidates all database and authentication details for the app. 
 - Persistence: Convex schema for users, chats, messages, documents, suggestions, votes, files, streams
 - Access control: Ownership checks at Convex layer using `ctx.auth.getUserIdentity()`
 - Guests: Supported with unauthenticated Convex client mapped to guest records in `users`
+ - Credits: Guests use a non-HttpOnly cookie (`anonymous-session`) to track remaining credits; registered users have Convex credit fields scaffolded for future paid plans
 
 ## Clerk Integration
 
@@ -47,6 +48,7 @@ See `frontend/convex/schema.ts` for full definitions and indices.
 
 - `users`
   - `clerk_id?`, `email?`, `name?`, `image_url?`, `is_guest`, `guest_id?`, usage counters, timestamps
+  - Credits (registered users): `credits?`, `reserved_credits?` (currently default to 1000; reservation disabled at runtime)
   - Indices: `by_clerk_id`, `by_email`, `by_guest_id`
 - `chats`
   - `id` (UUID), `user_id`, `title`, `visibility`, counters, timestamps
@@ -74,6 +76,22 @@ See `frontend/convex/schema.ts` for full definitions and indices.
 
 - Users (`frontend/convex/users.ts`)
   - `getCurrentUser` (query), `ensureUser` (mutation), `createGuestUser` (mutation), `getUserById` (query), `updateProfile`, `getUserStats`
+- Credits (`frontend/convex/credits.ts`)
+  - `getUserCreditsInfo` (query)
+  - `reserveAvailableCredits` (mutation)
+  - `finalizeCreditsUsage` (mutation)
+  - `releaseReservedCredits` (mutation)
+
+## Guest Credits & Cookies
+
+- Cookie key: `anonymous-session`
+- Shape (JSON): `{ id: string, remainingCredits: number, createdAt: ISO string }`
+- TTL: 24 hours (`ANONYMOUS_LIMITS.SESSION_DURATION`)
+- Client-visible: cookie is not HttpOnly so the UI banner and sidebar can display live remaining credits
+- Deduction policy (feature-flagged):
+  - Guest requests deduct a base model cost per send (chat-model=1, reasoning=2) and refund on error
+  - Block at 0 with CTA to sign in; a banner above the input communicates remaining credits
+  - Registered users: unlimited for chat; specialist runs may apply separate costs later
 - Chats (`frontend/convex/chats.ts`)
   - `createChat`, `getUserChats`, `getUserChatsById`, `getChatById`, `updateChatTitle`, `deleteChat`
   - `sendMessage`, `getChatMessagesById`, `startStream`, `completeStream`, `getActiveStreams`

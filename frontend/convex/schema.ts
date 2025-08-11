@@ -22,6 +22,10 @@ export default defineSchema({
     chat_count: v.number(),
     document_count: v.number(),
     
+    // Credits system (registered users)
+    credits: v.optional(v.number()),
+    reserved_credits: v.optional(v.number()),
+    
     // Timestamps
     created_at: v.number(),
     updated_at: v.number(),
