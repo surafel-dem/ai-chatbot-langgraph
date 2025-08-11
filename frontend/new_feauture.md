@@ -1,114 +1,97 @@
-### Reliability Analysis Agent – Implementation Plan
+### Reliability Analysis orchestration: concrete breakdown (using your prompt pack)
 
-- Goals
-  - Add an orchestrated “Reliability Analysis” specialist agent on top of current chat (Convex + Clerk + guest credits remain).
-  - Trigger via Quick Selection or chat intent routing (orchestrator).
-  - Stream step-by-step Tasks and render a final report artifact with sources.
-  - Use AI Elements for Conversation, Response, Task, Actions UI.
-  - Keep registered users unlimited for now; guests pay a higher fixed credit per run.
+- Orchestrator (router)
+  - Entrypoints:
+    - Quick Selection: Reliability Analysis → start run.
+    - Chat: classify last user message; if “reliability” → start run; else normal chat.
+  - States: idle → confirmCar → research → report → done. Persist state in `research_runs.status`.
+  - Credits:
+    - Guests: deduct 5 credits at run start; block at 0.
+    - Registered: no cap (future: paid credits).
 
-- References
-  - AI Elements: Conversation, Response, Task, Actions: https://ai-sdk.dev/elements/components/conversation, https://ai-sdk.dev/elements/components/response, https://ai-sdk.dev/elements/components/task
-  - Minimal deep-research orchestration patterns: https://github.com/FranciscoMoretti/ai-sdk-deep-research?tab=readme-ov-file
-  - Base chat template streaming: https://github.com/vercel/ai-chatbot
+- Specialist agent (Reliability) as 4 sub‑agents (mapped from RELIABILITY_ANALYSIS_INSTR)
+  - CarConfirmer
+    - Goal: normalize/confirm {year, make, model} (and optional preferences).
+    - If ambiguous, return top 3 candidates to user → await selection → resume.
+  - ProblemFinder
+    - Goal: 3–5 common problems with symptoms, severity (Major/Minor), rough repair complexity/cost if surfaced. Use Ireland/UK bias.
+    - Queries (from your prompt): “{YMM} common problems Ireland/UK”, “engine problems”, “transmission faults”, “electrical issues”, etc.
+  - RecallFinder
+    - Goal: official recalls (RSA.ie, GOV.UK DVSA) with issue + production dates/VIN ranges if available; advise VIN check.
+  - MaintenanceAdvisor
+    - Goal: 2–3 key maintenance tips; expensive routine items; longevity notes; bias to YMM‑specific.
+  - Synthesizer
+    - Goal: merge all; compute dimension scores {engine/drivetrain, electrical, body/interior, recalls/TSBs, maintenance/TCO}; write final report Markdown with inline [n] citations and numbered Sources.
 
-- Architecture
-  - Orchestrator (router):
-    - If Quick Selection “Reliability Analysis” → start reliability run directly.
-    - Else classify last chat message (rule-first, LLM fallback) → either normal chat or reliability.
-    - Confirmation stage: normalize/confirm car make/model/year; handle ambiguity by proposing top candidates.
-  - Specialist agent (reliability):
-    - Steps: confirmCar → planQueries → fetch+summarize → extractIssues → scoreDimensions → draftReport → finalizeReport.
-    - Tools: web search, fetch page, extract notes, aggregate+score, report writer.
-    - Streaming: emit TaskStart/TaskUpdate/TaskFinish; FinalReport (markdown + scores + sources).
+- Prompts (split from your RELIABILITY_ANALYSIS_INSTR)
+  - confirmCarPrompt: extract/normalize YMM + preferences; if ambiguous, propose top 3; ask user to pick.
+  - problemsPrompt: ProblemFinder with the provided query list and source targets; output schema below.
+  - recallsPrompt: RecallFinder for RSA/DVSA; output schema below.
+  - maintenancePrompt: maintenance & longevity; output schema below.
+  - synthPrompt: apply <output_format>, <report_format>, <document_structure>, <style_guide>, <citations>; produce final Markdown + scores + sources.
 
-- Data model (Convex)
-  - research_runs
-    - id (string UUID), user_id (guests/registered), type: 'reliability', params: { make, model, year }, status: 'pending' | 'running' | 'done' | 'error', created_at, updated_at, linked_chat_message_id?
-  - research_events
-    - run_id, type: 'task-start' | 'task-update' | 'task-finish' | 'final-report', payload (JSON), created_at
-  - Optional research_sources (if you want a table): run_id, title, url, excerpt, score
-  - Queries/Mutations:
-    - createRun, appendEvent, completeRun, getRun(+events), listRuns (ownership enforced via Clerk subject)
+- Output JSON schemas (tool/object outputs)
+  - problems.json
+    - problems: Array<{ title, severity: 'Major'|'Minor', symptoms: string[], notes?: string, citations: string[] }>
+  - recalls.json
+    - recalls: Array<{ title, issue, dates?: string, vinRange?: string, citations: string[] }>
+  - maintenance.json
+    - tips: Array<{ tip: string, why: string, citations?: string[] }>
+    - expensiveItems?: Array<{ item: string, when: string, approxCost?: string }>
+  - final.json
+    - reportMarkdown: string
+    - scores: { engine: number, electrical: number, body: number, recalls: number, tco: number }
+    - sources: Array<{ id: number, title: string, url: string, excerpt?: string }>
+    - warnings?: string[]
 
-- API (Next.js routes)
+- Streaming to AI Elements
+  - SSE events:
+    - task-start { id, title }
+    - task-update { id, items: Array<string|{type:'file'|'text',text,file?}> } → map to `<TaskItem/>`
+    - task-finish { id, summary }
+    - final-report { reportMarkdown, scores, sources[] } → render with `<Response/>` + Sources.
+  - Tasks UI: AI Elements Task (install once) [Task docs](https://ai-sdk.dev/elements/components/task).
+  - Final Markdown: AI Elements Response (streaming‑optimized markdown) [Response docs](https://ai-sdk.dev/elements/components/response).
+  - Conversation: wrap chat list with AI Elements Conversation (auto‑scroll) [Conversation docs](https://ai-sdk.dev/elements/components/conversation).
+
+- API routes
   - Orchestrator: `app/(orchestrator)/api/route.ts`
-    - Input: chatId, last user message, optional quickSelection
-    - Output: { action: 'chat' } | { action: 'startRun', runType: 'reliability', params }
-    - If starting run, create run row, optionally post a chat “handoff” message linking to run page
-  - Reliability agent: `app/(research)/api/reliability/route.ts`
-    - Input: runId, (car params when creating)
-    - SSE stream (AI SDK): TaskStart/TaskUpdate/TaskFinish; FinalReport
-    - Persist each event in Convex; on finish, save final report
+    - Input: { chatId?, quickSelection?, lastUserText? }
+    - Output: { action:'startRun', type:'reliability', params:{car, preferences?} } | { action:'chat' }
+  - Reliability stream: `app/(research)/api/reliability/route.ts`
+    - create run if needed; emit SSE:
+      1) task-start confirmCar → (if ambiguous) return choices; wait user selection; resume
+      2) task-start problems → stream task-update bullets per source cluster
+      3) task-start recalls → stream task-update bullet list
+      4) task-start maintenance → stream task-update list
+      5) task-start synthesis → task-finish with summary
+      6) final-report with reportMarkdown/scores/sources
+    - Persist each event in Convex.
 
-- Prompts (prompt pack)
-  - confirmCar: “Normalize/confirm make, model, year; if ambiguous, propose top 3 with differences; ask user to select one.”
-  - planQueries: “Generate 5–8 reliability-focused queries (recalls, TSBs, common failures, long-term ownership, drivetrain issues, TCO) for {car}.”
-  - extractIssues: “Summarize each source (bullets + short excerpt + URL).”
-  - scoreDimensions: “Score 1–10 per dimension: engine/drivetrain, electrical, body/interior, recalls/TSBs, maintenance/TCO. Give 1-sentence justification with citations.”
-  - finalizeReport: “Produce concise Markdown: Overview, Dimension Scores (with short justifications), Sources.”
+- Convex schema additions
+  - `research_runs`: { id, user_id, type:'reliability', params:{car, preferences?}, status, linked_chat_message_id?, created_at, updated_at }
+  - `research_events`: { run_id, type, payload, created_at }
+  - Queries: getRun(run_id), listRuns(type?), getRunEvents(run_id)
+  - Mutations: createRun(params), appendEvent(run_id,type,payload), completeRun(run_id)
 
-- Streaming schema (client-facing; sent via SSE)
-  - task-start: { id, title }
-  - task-update: { id, items: Array<string | { type:'file' | 'text', text, file? }> }
-  - task-finish: { id, summary }
-  - final-report: { reportMarkdown, sources: [{title,url,excerpt}], scores: { engine, electrical, body, recalls, tco } }
+- UI
+  - Quick Selections under chat input (Actions): Reliability Analysis → create run + navigate to `/(research)/reliability/[runId]`.
+  - Reliability page layout:
+    - Left: Task timeline from streamed events.
+    - Right: `<Response>` for final Markdown; Sources list; optional scores badges.
+  - Chat handoff message: “Started Reliability Analysis for {YMM} → View Progress”.
 
-- Frontend (UI/UX)
-  - Quick Selections (chat page):
-    - “Reliability Analysis” button: starts run and routes to run page
-  - Reliability run page: `app/(research)/reliability/[runId]/page.tsx`
-    - Left: Tasks (AI Elements Task/TaskTrigger/TaskContent/TaskItem) bound to streamed events
-    - Right: Final Report (AI Elements Response for markdown; AI Elements Sources for citations)
-    - If run is in confirm stage: small input/selection to choose exact car, then resume run
-  - Chat:
-    - Wrap messages with AI Elements Conversation; render each text part with Response (streaming markdown)
+- Credits & limits (current)
+  - Guests: deduct 5 credits when run starts; banner + block at 0.
+  - Registered: unlimited (reservation disabled for now); future: enable reservation/finalization per run.
 
-- Library structure (new)
-  - `lib/ai/tools/reliability/`
-    - `prompts.ts`
-    - `reliability-agent.ts` (pipeline)
-    - `steps/web-search.ts`, `steps/fetch-summarize.ts`, `steps/extract-issues.ts`, `steps/score.ts`
-  - `lib/orchestrator/route-reliability.ts` (classification + normalization helpers)
+- Rollout order
+  1) Convex: runs/events tables + CRUD.
+  2) Reliability API route streaming (mock steps → then real web search/fetch/summarize).
+  3) Reliability page with AI Elements Task/Response + streaming wire‑up.
+  4) Orchestrator route + Quick Selection + chat handoff.
+  5) Credits deduction on run start for guests; docs/tests.
 
-- Credits and limits
-  - Guests: deduct e.g., 5 credits on run start; block at 0 (reuse cookie credits).
-  - Registered: unlimited for now (reservation disabled); future: enable reservation/finalization with per-step or per-run costs.
-
-- Feature flags and config
-  - `lib/feature-flags.ts`: `reliability: true`
-  - `.env.local`: search provider key (e.g., TAVILY_API_KEY); OPENAI_API_KEY etc.
-  - If REDIS_URL present, enable resumable stream optimization; otherwise return normal SSE (follow minimal deep-research fallback).
-
-- Telemetry and logging
-  - Log step boundaries (task-start/finish) and summary counts (sources found, tokens, timing).
-  - Keep PII out of logs; gate verbose logs to development.
-
-- Rollout
-  - Phase 1 (scaffold): Convex tables, routes skeletons, Task UI streaming with mocked steps.
-  - Phase 2 (agent): wire prompts + real web search + fetch/summarize + scoring + final report; stream events; persist.
-  - Phase 3 (orchestrator): chat integration + confirmation loop + quick selections; handoff message.
-  - Phase 4 (polish): credits gating for guests at run start, sources rendering, resume after refresh, tests.
-
-- Tests (acceptance)
-  - Start from Quick Selection → confirm car → progress Tasks appear → final report rendered with sources.
-  - Refresh mid-run → page resumes and replays from Convex events.
-  - Guests: credits decremented on run start; blocked at 0 with CTA.
-  - Registered: no block; credits unchanged for now.
-
-- Documentation
-  - Add “Specialists” section in README/docs:
-    - How to start Reliability Analysis
-    - Streaming Tasks UI (AI Elements Task) + final report (Response/Sources)
-    - Costs and limits (guests vs registered)
-    - How to add new specialist packs by swapping prompt bundles
-
-- Actionable next tasks
-  - Add Convex: `research_runs`, `research_events`, mutations/queries
-  - Implement `app/(research)/api/reliability/route.ts` streaming pipeline with mock data
-  - Build `app/(research)/reliability/[runId]/page.tsx` with AI Elements Task/Response
-  - Hook Quick Selection button to create run and navigate
-  - Add orchestrator route with basic rules; confirmation UI on run page
-  - Integrate real web search provider and finalize prompts
-  - Credits: deduct for guests on run start
-  - Tests + docs update
+References
+- Deep‑research streaming and orchestration ideas: [ai-sdk-deep-research](https://github.com/FranciscoMoretti/ai-sdk-deep-research?tab=readme-ov-file)
+- AI Elements components (Task/Response/Conversation): [Task](https://ai-sdk.dev/elements/components/task), [Response](https://ai-sdk.dev/elements/components/response), [Conversation](https://ai-sdk.dev/elements/components/conversation)

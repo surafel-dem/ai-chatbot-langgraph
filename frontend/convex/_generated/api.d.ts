@@ -20,10 +20,6 @@ import type * as crons from "../crons.js";
 import type * as documents from "../documents.js";
 import type * as files from "../files.js";
 import type * as http from "../http.js";
-import type * as runs from "../runs.js";
-import type * as sources from "../sources.js";
-import type * as steps from "../steps.js";
-import type * as tool_calls from "../tool_calls.js";
 import type * as users from "../users.js";
 
 /**
@@ -42,10 +38,6 @@ declare const fullApi: ApiFromModules<{
   documents: typeof documents;
   files: typeof files;
   http: typeof http;
-  runs: typeof runs;
-  sources: typeof sources;
-  steps: typeof steps;
-  tool_calls: typeof tool_calls;
   users: typeof users;
 }>;
 export declare const api: FilterApi<

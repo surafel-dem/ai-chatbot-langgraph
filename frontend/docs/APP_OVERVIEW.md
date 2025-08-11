@@ -90,7 +90,7 @@ tests/                  # Playwright E2E and route tests
   - Tools available for non-reasoning model: `getWeather`, `createDocument`, `updateDocument`, `requestSuggestions`
   - Credits (feature-flagged):
     - Guests: a readable `anonymous-session` cookie tracks `remainingCredits` (default 10/day in prod). Each send deducts a base model cost (chat-model=1, reasoning=2). At 0, requests are blocked with a CTA to sign in. Cookie resets daily.
-    - Registered users: Convex credits are reserved before streaming and finalized after streaming, using base model cost + per-tool fixed costs. Reservation is released on error/timeout.
+    - Registered users: unlimited for now. Convex reservation/finalization is scaffolded for future paid plans.
   - On finish, saves generated assistant messages and completes stream
   - DELETE supports chat deletion with ownership checks
 
@@ -137,6 +137,11 @@ tests/                  # Playwright E2E and route tests
 - Defined in `lib/ai/tool-costs.ts`:
   - Base model cost: chat-model=1, chat-model-reasoning=2
   - Tool costs: `getWeather:1`, `createDocument:5`, `updateDocument:5`, `requestSuggestions:1`
+
+### Specialists & Orchestrator (planned/rolling out)
+- We are adding a specialist layer with an orchestrator that routes user intent (or Quick Selections) to Reliability Analysis (first), Running Cost, or Purchase Advice.
+- Streaming emits AI Elements Task events for progress and a final report rendered with AI Elements Response.
+- See `docs/ORCHESTRATOR_MIGRATION.md` and `new_feauture.md` for sequencing and architecture.
 
 ### Artifacts and Document Handlers
 
